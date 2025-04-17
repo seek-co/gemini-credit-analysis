@@ -1,0 +1,19 @@
+Part 5: Based on the credit risks markdown output provided from Step 4 and using the web search tool, add public news and supplementary data that improves the credit risk analysis. For ALL financial metrics mentioned in your writings, you must EXPLICITLY QUANTIFY your statement and give ACTUAL METRIC VALUES that support you statement, using information retrieved from RAG knowledge vector database, and from web search result, and from API calling data.  First, you must go through EVERY POINT in the Credit Risk markdown file and identify the web search results or information you can find that can support this credit risk point. If there are relevant data or information in the web search result for this credit risk point, add the explanation and citation from documents to the markdown credit risk point. Next, you must go through all Credit Risk web search results and identify whether there are other credit risks that are not included in the existing Credit Risk markdown. If there are additional credit risks, then add them to the markdown output following the existing format. 
+
+You must output in MARKDOWN format the same way as the Credit Risk markdown from Step 2, and add extra information or citation from web search results using this template below, WITHOUT any other extra comments.
+Template:
+## Credit Risk
+### [Risk category #1]
+- [Exact and original Point #1 from provided markdown with explanation]. [Additional explanation or data citation from web search results, if exists]
+...
+- [New Point discovered in web search, if exists. Include citation and explanation supported by true metric values]
+...
+
+### [New risk category discovered in web search, if exists]
+...
+
+**References**
+1. [^<numbering of your citation>]: [cite: <citation markdown format>, where <citation markdown format> follows the rules mentioned above depending on whether the citation is from the RAG knowledge vector database, or from a API tool, or from a web search]
+2. [^<numbering of your citation>]: ...
+
+

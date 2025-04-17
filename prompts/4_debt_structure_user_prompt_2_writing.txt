@@ -1,0 +1,28 @@
+Step 5: Use the debt and bond details table markdown output from previous steps, and RAG knowledge vector database context data, and web search results, construct the following subsections for the 'Debt Structure & Maturity Profile' section:
+- Debt Composition: Describe gross debt (or total debt) and secured portion in the G3 currencies, such as gross debt (or total debt), secured debt, Secunda assets, Loan-to-Value, and other important debt metrics. The G3 currencies are USD (US Dollar), GBP (British Pound) and Euro. Write descriptive explanation backed by metric values found from RAG knowledge vector database and any additional information found from web search results, to describe in detail on the debt composition of the company. For ALL financial metrics mentioned in your writing, you must EXPLICITLY QUANTIFY your statement and give ACTUAL METRIC VALUES that support you statement, using information retrieved from RAG knowledge vector database, and from web search result, and from API calling data.
+- Key Components: Use the debt and bond details table markdown output from previous steps, and retrieve information from RAG knowledge database and list all debt components and compositions that are under the G3 currencies, and put the all the key components in bullet point list. Each point in the list must be backed by metric values found from RAG knowledge vector database and any additional information found from web search results. For ALL financial metrics mentioned in your writing, you must EXPLICITLY QUANTIFY your statement and give ACTUAL METRIC VALUES that support you statement, using information retrieved from RAG knowledge vector database, and from web search result, and from API calling data.
+- Debt Instrument Summaries: List down ALL Debt Instruments in bullet points, analyse the provided bond documents and extract: issue amount, coupon rate, maturity date, any special features (convertible, redemption clauses, covenants). It is very important to include all DEBTS in G3 currencies and company's local currency, and not just only bonds. For ALL financial metrics mentioned in your writing, you must EXPLICITLY QUANTIFY your statement and give ACTUAL METRIC VALUES that support you statement, using information retrieved from RAG knowledge vector database, and from web search result, and from API calling data. Write a descriptive explanation backed by metric values found from RAG knowledge vector database for each debt instrument and any additional information found from web search results.
+
+You must output in MARKDOWN format and must follow this template, WITHOUT any other extra comments.
+Markdown template:
+## Debt Structure and Maturity Profile
+### Debt Composition
+[Description of gross debt (or total debt) and secured portion in the G3 currencies, backed by metric values found from RAG knowledge vector database describe in detail on the debt composition of the company. Writing for 'Debt Composition' with citation on information retrieved from RAG knowledge vecetor database and additional information from web search results]
+
+### Key Components
+- [Point #1 for debt components and compositions with citation and explanation and metrics backed by information from RAG knowledge vector database and any additional information found from web search results]
+- [Point #2 for debt components and compositions with citation and explanation and metrics backed by information from RAG knowledge vector database and any additional information found from web search results]
+- ...
+
+### Debt Instrument Summaries
+- [Year of Instrument #1] [Debt type of Instrument #1, for example bonds, notes, or others] - [coupon rate of Instrument #1], Due on [maturity date of Instrument #1, in the format of DAY-MONTH-YEAR, MONTH is written in full form]
+[Descriptive explanation backed by metric values found from RAG knowledge vector database for Instrument #1]
+- [Year of Instrument #2] [Debt type of Instrument #2, for example bonds, notes, or others] - [coupon rate of Instrument #2], Due on [maturity date of Instrument #2, in the format of DAY-MONTH-YEAR, MONTH is written in full form] 
+[Descriptive explanation backed by metric values found from RAG knowledge vector database for Instrument #1]
+- [Year of Instrument #2] [Debt type of Instrument #2, for example bonds, notes, or others] - [coupon rate of Instrument #2], Due on [maturity date of Instrument #2, in the format of DAY-MONTH-YEAR, MONTH is written in full form] ...
+
+**References**
+1. [^<numbering of your citation>]: [cite: <citation markdown format>, where <citation markdown format> follows the rules mentioned above depending on whether the citation is from the RAG knowledge vector database, or from a API tool, or from a web search]
+2. [^<numbering of your citation>]: ...
+
+

@@ -1,0 +1,10 @@
+### Other Quantitative Metrics
+| Metric | [Latest half-year] | [Second-latest half-year] |
+| ----------- | ----------- | ----------- |
+| [Metric #1] | [Metric #1 value based on CSV table provided by user for latest half-year] | [Metric #1 value based on CSV table provided by user for second-latest half-year] |
+| [Metric #2] | [Metric #2 value based on CSV table provided by user for latest half-year] | [Metric #2 value based on CSV table provided by user for second-latest half-year] |
+| [Metric #3] | ...
+
+
+**References**
+[^<numbering of your citation>]: [cite: <citation markdown format>, where <citation markdown format> follows the rules mentioned above depending on whether the citation is from the RAG knowledge vector database, or from a API tool, or from a web search]

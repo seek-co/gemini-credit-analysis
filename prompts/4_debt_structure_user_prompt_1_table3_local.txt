@@ -1,0 +1,27 @@
+Step 3: Use the bond and debt tables markdown output from previous steps, RAG knowledge vector database and web search results to construct the bond and debt information table in the 'Debt Structure & Maturity Profile' section. Check the API calling bonds data against the bond information acquired from the RAG knowledge vector database to make sure that the bonds information and values are CORRECT. It is VERY IMPROTANT that you retrieve information from the tables and figures in the RAG knowledge database. If the API calling data for a particular entry is 'None' or empty, then acquire the bond metric or value information by searching through the RAG knowledge vector database and peform web search for the company's bond information. If a particular bond and debt table value cannot be found in both API calling data and the RAG knowledge vector database, then you do web search to get the missing formula elements to calculate or fill in the unfound bond and debt value. 
+
+Construct the table showing '[company's local currency] Denominated Debt'
+This is the table for the Denominated Debts in the company's local currency. It is very important to consider all denominated DEBTS in company's local currency, and not just only bonds. You must construct this table by retrieving information from the RAG knowledge vector database on ALL the company's denominated debts in the company's local currency. This table should only show local currency debts that are maturing in the future after today's date.
+- Instrument: Instrument name of the denominated debt, in the format of [Short note name] ([coupon rate]%)
+- Amount ([company's local currency short form, example: JPY for Japanese Yen]): The amount issued for the bond. Put the amount in the format of: [value rounded to nearest million for pretty display, or billion if the number value is still too large after rounding to million display. Example: value '650000000' will round to '650 million'. If the rounded value shows decimal point, then standardize the number of decimal points showing for all the rows] [short form 'Bn' if rounded to billion, 'Mn' if rounded to million]. Decide of the number of decimal points that needs to be shown after rounding to either million or billion, and STANDARDIZE the number of decimal points showing for ALL the bond series rows.
+- Maturity Date: The maturity date of the particular bond, in the format of [day, showing in 2 digits. for example, 01 for day 1, 25 for day 25]-[month, in 3 letter representation with first letter capitalised. eg. Jan for January]-[year, showing last two digits of the year only. for example: 24 for year 2024].
+- Coupon Rate: The coupon rate of the particular bond, in the format of [rate in 2 decimal points]%
+- Covenants: Short note on the covenants of this bond, that are the legally binding clauses included in a debt agreement, such as a bond or loan contract, that sets specific terms and conditions for the borrower, and so on that are designed to protect the interests of lenders and ensure the borrower maintains financial discipline. For ALL financial metrics mentioned in your covenant explanation, you must EXPLICITLY QUANTIFY your statement and give ACTUAL METRIC VALUES that support you statement, using information retrieved from RAG knowledge vector database, and from web search result, and from API calling data. For example, Negative pledge on capital [with short note on the detail of the limitations of this covenant], Interest coverage ratio [with short note on the detail of the metric exceeding a certain threshold, for example: ratio < 1.5]
+
+Table entries value style and formatting:
+- All citation for table entries inside a table must be in the format of square-bracket caret numbering in the format: [^<numbering of your citation>]. Then list right after the table for the citations that are used inside the table, in the format [^<numbering of your citation>]: [follow the same style and format provided to you in the system prompt]. 
+- All amount value entries must be in the format of: [Currency short form, example: GBP for british bound] [value rounded to either million or billion for human-readable and pretty display, and standardize this rounding across all rows] [short form 'Bn' if rounded to billion or 'Mn' if rounded to million]. You must STANDARDIZE the unit million or billion showing across ALL the rows. Decide of the number of decimal points that needs to be shown after rounding to either million or billion, and STANDARDIZE the number of decimal points showing for ALL the rows.
+- All percentage values must be in the format of: [pecentage value rounded to 2 decimal points]%.
+
+You must output in MARKDOWN format and must follow this template, WITHOUT any other extra comments.
+Markdown Table template:
+#### [company's local currency] Denominated Debt
+| Instrument Name | Amount ([currency short form] [short form 'Bn' if rounded to billion or 'Mn' if rounded to million]) | Maturity Date | Coupon Rate | Covenants |
+| [Instrument #1] | [Amount of Instrument #1] | [Maturity Date of Instrument #1] | [Coupon Rate of Instrument #1] | [Covenant of Instrument #1] |
+| [Instrument #2] | ...
+
+**References**
+1. [^<numbering of your citation>]: [cite: <citation markdown format>, where <citation markdown format> follows the rules mentioned above depending on whether the citation is from the RAG knowledge vector database, or from a API tool, or from a web search]
+2. [^<numbering of your citation>]: ...
+
+

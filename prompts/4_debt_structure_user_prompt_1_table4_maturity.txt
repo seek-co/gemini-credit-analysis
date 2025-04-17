@@ -1,0 +1,27 @@
+Step 4: Use the bond and debt tables markdown output from previous steps, Use API calling data, RAG knowledge vector database and web search results to construct the bond and debt information table in the 'Debt Structure & Maturity Profile' section. Check the API calling bonds data against the bond information acquired from the RAG knowledge vector database to make sure that the bonds information and values are CORRECT. Use the all the bond and debt tables provided from previous steps to create the summary table for Debt Maturity Wall.
+
+Construct the table of 'Debt Maturity Wall'
+This is the table that sums up the debts maturing in the future by each future years. It is very important to consider all DEBTS, and not just only bonds. This table should only show debts that are maturing in the future after today's date. You must only consider debts maturing after today's date in your calculations.
+- Year: The year where the debt amount will mature. Arrange the year rows in ascending order. 
+- G3 Debts ([short form 'Bn' if rounded to billion, 'Mn' if rounded to million]): Total amount of G3 currency debts that will be maturing in a particular year. Put G3 Debts entries in the format of: [currency short form] [value rounded to nearest million for pretty display, or billion if the number value is still too large after rounding to million display, and showing 2 decimal points. Example: value '650000000' will round to '650.00 million'.] [short form 'Bn' if rounded to billion, 'Mn' if rounded to million]. Round G3 Debt entries to 2 decimal points.
+- [company's local currency] Debt ([short form 'Bn' if rounded to billion, 'Mn' if rounded to million]): You MUST identify correctly the company's local currency, either from RAG knowledge vector database, or API calling data, or web search results. Total amount of the company's local currency debts that will be maturing in a particular year. Put company's local currency Debt entries in the format of: [company's local currency] [value rounded to nearest million for pretty display, or billion if the number value is still too large after rounding to million display, and showing 2 decimal points. Example: value '650000000' will round to '650.00 million'.] [short form 'Bn' if rounded to billion, 'Mn' if rounded to million]. Round company's local currency Debt entries to 2 decimal points.
+- % of Total Debt: the percentage of a particular year's debt is occupying across all debts. Formula = (G3 Debts of a particular year + Local Currency Debts of a particular year) / (G3 Debts across all years + Local Currency Debts across all years)
+
+Table entries value style and formatting:
+- All citation for table entries inside a table must be in the format of square-bracket caret numbering in the format: [^<numbering of your citation>]. Then list right after the table for the citations that are used inside the table, in the format [^<numbering of your citation>]: [follow the same style and format provided to you in the system prompt]. 
+- All amount value entries must be in the format of: [Currency short form, example: GBP for british bound] [value rounded to either million or billion for human-readable and pretty display, and standardize this rounding across all rows] [short form 'Bn' if rounded to billion or 'Mn' if rounded to million]. You must STANDARDIZE the unit million or billion showing across ALL the rows. Decide of the number of decimal points that needs to be shown after rounding to either million or billion, and STANDARDIZE the number of decimal points showing for ALL the rows.
+- All percentage values must be in the format of: [percentage value rounded to 2 decimal points]%.
+
+You must output in MARKDOWN format and must follow this template, WITHOUT any other extra comments.
+Markdown Table template:
+### Debt Maturity Wall
+| Year of Maturity | G3 Debt Amount | [company's local currency] Debt Amount | Percentage of Total Debt |
+| [Most recent year #1] | [G3 Debt amount for most recent year #1] | ...[company's local currency debt amount for most recent year #1] | [% of total debt for year #1] |
+| [Next most recent year #2] | ...
+| **Total** | **[Sum over all the G3 debts]** | **[Sum over all the company's local currency debts] | [Sum over all the percentages of total debts and make sure it sums up to 100%]** |
+
+**References**
+1. [^<numbering of your citation>]: [cite: <citation markdown format>, where <citation markdown format> follows the rules mentioned above depending on whether the citation is from the RAG knowledge vector database, or from a API tool, or from a web search]
+2. [^<numbering of your citation>]: ...
+
+

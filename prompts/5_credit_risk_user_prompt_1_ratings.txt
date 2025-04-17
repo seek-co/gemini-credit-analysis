@@ -1,0 +1,24 @@
+Part 1: Identify the list of credit risks 
+Using the RAG knowledge vector database context retrieving on the company named: _COMPANY_NAME_, you must identify the list credit risks. The list should be as extensive as possible and contain ALL credit risks. Examples of credit risk are regulatory risks, supply chain risk, management risk, and everything else that you can find from the RAG knowledge vector database. For ALL financial metrics mentioned in your writings, you must EXPLICITLY QUANTIFY your statement and give ACTUAL METRIC VALUES that support you statement, using information retrieved from RAG knowledge vector database, and from web search result, and from API calling data. 
+
+You must output in MARKDOWN format, with each risk category as a heading. Your markdown output must follow this template, WITHOUT any other extra comments.
+Markdown template:
+## Credit Risk
+### Regulatory Risks
+- New Tax Act: [explanation supported by true metric values and data citation from documents]
+- [Point #2 under this risk]: [explanation supported by true metric values or data citation from documents]
+...
+
+### [Risk category #2]
+- [Point #1 under this risk]: [explanation supported by true metric values or data citation from documents]
+- [Point #2 under this risk]: [explanation supported by true metric values or data citation from documents]
+...
+
+### [Risk category #3]
+...
+
+**References**
+1. [^<numbering of your citation>]: [cite: <citation markdown format>, where <citation markdown format> follows the rules mentioned above depending on whether the citation is from the RAG knowledge vector database, or from a API tool, or from a web search]
+2. [^<numbering of your citation>]: ...
+
+

@@ -1,0 +1,19 @@
+Part 2: Based on the credit risks markdown output provided from Step 1 and the RAG knowledge vector database context retrieved for the company named: _COMPANY_NAME_, add detailed context and comprehensive data to support the credit risk point findings in the provided markdown. For ALL financial metrics mentioned in your writings, you must EXPLICITLY QUANTIFY your statement and give ACTUAL METRIC VALUES that support you statement, using information retrieved from RAG knowledge vector database, and from web search result, and from API calling data. First, you must go through EVERY POINT in the credit risk markdown provided and identify the additional data or information you can find from the RAG knowledge vector database that can support this credit risk point. If there are relevant data or information in the RAG knowledge vector database for this credit risk point, you must add the explanation and citation from documents to the markdown credit risk point. Next, you must identify whether there are other credit risks that exists in the RAG knowledge vector database, and are currently not included in the existing credit risk markdown. If there are additional credit risks, then add them to the markdown output following the existing format. 
+
+You must output in MARKDOWN format the same way as the Credit Risk markdown from Step 1, and add information or citation from the RAG knowledge vector database using this template below, WITHOUT any other extra comments.
+Template:
+## Credit Risk
+### [Risk category #1]
+- [Exact and original Point #1 from provided markdown with explanation supported by true metric values]. [Additional explanation supported by true metric values or data citation from the RAG knowledge vector database, if exists]
+...
+- [New Point discovered in documents, if exists. Include citation and explanation supported by true metric values]
+...
+
+### [New risk category discovered in documents, if exists]
+...
+
+**References**
+1. [^<numbering of your citation>]: [cite: <citation markdown format>, where <citation markdown format> follows the rules mentioned above depending on whether the citation is from the RAG knowledge vector database, or from a API tool, or from a web search]
+2. [^<numbering of your citation>]: ...
+
+

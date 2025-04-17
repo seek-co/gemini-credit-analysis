@@ -1,0 +1,28 @@
+Write for the following subsections: Leverage and Covenant Compliance, Liquidity Risks, Profitability or Operational Cash Flow Pressures. For all financial metrics mentioned in your writings, you must EXPLICITLY QUANTIFY your statement and give ACTUAL METRIC VALUES that support you statement, using information retrieved from RAG knowledge vector database, and from web search result, and from API calling data. The relevant metrics can be found in the tables of income statement, cashflow and balance sheet for a company in specific years, so it is very helpful if you include these query keywords when searching in RAG knowledge vector database.
+Use the markdown output from Step 1, RAG knowledge vector database context data and important web search data to write for the following subsections: 
+- Leverage and Covenant Compliance: Present relevant metrics such as the debt-to-equity ratio, total debt ratio, and interest coverage ratio. Provide calculations and explain what these ratios indicate about the company's financial structure. Look for explanation from the provided documents. Summarize the overall leverage position and covenant compliance, indicating whether the company is in a healthy position or if there are concerns that need to be addressed.
+- Liquidity Risks: Explains company's ability to meet short-term financial obligations. Discuss the company's cash flow from operations and how it supports liquidity. Highlight any trends in cash flow that may indicate potential liquidity issues. Include metrics such as the current ratio, quick ratio, and cash conversion cycle. Provide calculations and interpretations of these ratios to illustrate the company's liquidity position. Summarize the liquidity position, indicating whether the company has adequate liquidity to meet its short-term obligations or if there are risks that could impact its liquidity.
+- Profitability or Operational Cash Flow Pressures: Analyze the operational cash flow and its trends over time. Discuss any pressures on cash flow, such as increased costs, declining revenues, or changes in working capital. Summarize the profitability position and any operational cash flow pressures, indicating whether the company is generating sufficient profits to support its operations and meet its financial obligations.
+
+You must output in MARKDOWN format and must follow this template.
+Markdown template:
+#### Leverage and Covenant Compliance
+- [Point #1 for Leverage and Covenant Compliance, with explanation and citation]
+- [Point #2 for Leverage and Covenant Compliance, with explanation and citation]
+- ...
+
+#### Liquidity Risks
+- [Point #1 for Liquidity Risks, with explanation and citation]
+- [Point #2 for Liquidity Risks, with explanation and citation]
+- ...
+
+#### Profitability or Operational Cash Flow Pressures
+- [Point #1 for Profitability or Operational Cash Flow Pressures, with explanation and citation]
+- [Point #2 for Profitability or Operational Cash Flow Pressures, with explanation and citation]
+- ...
+
+**References**
+1. [^<numbering of your citation>]: [cite: <citation markdown format>, where <citation markdown format> follows the rules mentioned earlier depending on whether the citation is from the RAG knowledge vector database, or from a API tool, or from a web search]
+2. [^<numbering of your citation>]: ...
+
+

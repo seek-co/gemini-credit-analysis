@@ -1,0 +1,14 @@
+For the company _COMPANY_NAME_, call for the 'gpt_4o_web_search_tool' function to identify today's date in Anywhere on Earth (AOE) timezone, and use today's date you found as the CUTOFF DATE whenever you are doing analysis and further search on other information for the rest of this chat session. Call for the 'get_financial_metrics_yf_api' and 'get_financial_metrics_api_for_chatbot_tool' function to extract the company's financial metric data, and call for the 'get_bond_data_api_for_chatbot_tool' function to extract the company's bond data.
+
+You must write your response using this format below within the triple backticks:
+```
+Today's date in Anywhere-on-Earth (AoE) timezone that MUST be used as the analysis and data CUTOFF DATE for the rest of this chat session is: [today's date you identified from web search]
+
+The CSV tables financial metric data of the company _COMPANY_NAME_ for analysis and further search on other information in the rest of this chat session are:
+[put CSV table #1 financial metric data you extracted here]
+
+[put CSV table #2 financial metric data you extracted here]
+
+The CSV table bonds data of the company _COMPANY_NAME_ for analysis and further search on other information in the rest of this chat session is:
+[put the CSV table bonds data you extracted here]
+```

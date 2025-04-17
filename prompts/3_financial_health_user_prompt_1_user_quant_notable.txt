@@ -1,0 +1,49 @@
+Step 1: Construct profitability metric, liquidity and leverage metric, or other quantitative metric tables
+Use the provided documents to calculate the metrics listed below and create the required MARKDOWN table using the acquired document data and calculations.
+- Revenue
+- Adjusted EBITDA
+- EBITDA Margin
+- Net Income
+- Net Income Margin
+- Cash & Equivalents
+- Current Ratio
+- Net Debt (Excl. Leases)
+- Debt/EBITDA (LTM)
+- Interest Coverage Ratio
+
+The columns of the metric tables are as follows:
+- Latest half-year: H1 or H2 of the most recent year in the provided data.
+- Same half-year one-year ago: For example, if latest half-year is 'H1 2022', then 'Same half-year one-year ago' is 'H1 2021'.
+- Second-latest half-year: For example, if latest half-year is H1 2022, then 'Second-latest half-year' is 'H2 2021'.
+
+For the user provided quantitative metrics:
+- Metric #1: Proprietary Ratio
+Calculation Formula: Total Equity/ Total Tangible Assets
+
+You must output in MARKDOWN format and must follow this template, WITHOUT any other extra comments.
+Markdown template:
+## Financial Health
+### Profitability Metrics
+| Metric | [Latest half-year] | [Same half-year one-year ago] |  Year-on-Year Change |
+| ----------- | ----------- | ----------- | ----------- |
+| Revenue | [Revenue for latest half-year from data] | [Revenue for same half-year one-year ago from data] | [Revenue year-on-year change in percentage] |
+| Adjusted EBITDA | [Adjusted EBITDA for latest half-year from data] | [Adjusted EBITDA for same half-year one-year ago from data] | [Adjusted EBITDA year-on-year change in percentage] |
+| EBITDA Margin | [EBITDA Margin for latest half-year from data] | [EBITDA Margin for same half-year one-year ago from data] | [EBITDA Margin year-on-year change in percentage] |
+| Net Income | [Net Income for latest half-year from data] | [Net Income for same half-year one-year ago from data] | [Net Income year-on-year change in percentage] |
+| Net Income Margin | [Net Income Margin for latest half-year from data] | [Net Income Margin for same half-year one-year ago from data] | [Net Income Margin year-on-year change in percentage] |
+
+### Liquidity and Leverage
+| Metric | [Latest half-year] | [Second-latest half-year] |
+| ----------- | ----------- | ----------- |
+| Cash and Equivalents | [Cash and Equivalents for latest half-year from data] | [Cash and Equivalents for second-latest half-year from data] |
+| Current Ratio | [Current Ratio for latest half-year from data] | [Current Ratio for second-latest half-year from data] |
+| Net Debt (Excl. Leases) | [Net Debt (Excl. Leases) for latest half-year from data] | [Net Debt (Excl. Leases) for second-latest half-year from data] |
+| Debt/EBITDA (LTM) | [Debt/EBITDA (LTM) for latest half-year from data] | [Debt/EBITDA (LTM) for second-latest half-year from data] |
+| Interest Coverage Ratio | [Interest Coverage Ratio for latest half-year from data] | [Interest Coverage Ratio for second-latest half-year from data] |
+
+### Other Quantitative Metrics
+| Metric | [Latest half-year] | [Second-latest half-year] |
+| ----------- | ----------- | ----------- |
+| [Metric #1] | [Metric #1 calculation based on quantitative formula provided by user and using data for latest half-year] | [Metric #1 calculation based on quantitative formula provided by user and using data for second-latest half-year] |
+| [Metric #2] | [Metric #2 calculation based on quantitative formula provided by user and using data for latest half-year] | [Metric #2 calculation based on quantitative formula provided by user and using data for second-latest half-year] |
+| [Metric #3] | ...
