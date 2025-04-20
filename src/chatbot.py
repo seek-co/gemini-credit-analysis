@@ -2,7 +2,7 @@ import markdown
 import dash_bootstrap_components as dbc
 from dash import html, dcc
 
-from src.util import gpt_o1_loop_reasoning_with_tools, ReasoningToolSchema
+from src.util import gemini_pro_loop_with_tools, ReasoningToolSchema
 
 
 def render_chat_input():
@@ -61,15 +61,14 @@ def render_message(text:str, box:str = "AI"):
 
 
 class ChatBot:
-    def __init__(self, llm: str, reasoning_effort: str = "high"):
+    def __init__(self, llm: str):
         self.llm = llm
-        self.reasoning_effort = reasoning_effort
         self.chat_history = []
 
     def generate_response(self, company_name, user_prompt):
         tl = ReasoningToolSchema()
         tools = [
-            tl.rag_retrieval_tool, tl.gpt_4o_web_search_tool, tl.get_financial_metrics_yf_api_tool,
+            tl.rag_retrieval_tool, tl.gemini_web_search_tool, tl.get_financial_metrics_yf_api_tool,
             tl.get_bonds_api_for_chatbot_tool
         ]
         file_categories = ["financial", "bond", "ratings", "additional", "generated"]
@@ -77,9 +76,9 @@ class ChatBot:
             "role": "user",
             "content": [{"type": "input_text", "text": user_prompt}]
         })
-        response_str, step_outputs = gpt_o1_loop_reasoning_with_tools(
-            model_name=self.llm, reasoning_effort=self.reasoning_effort, input_messages=self.chat_history,
-            tools=tools, file_category=file_categories, company_name=company_name #
+        response_str, step_outputs = gemini_pro_loop_with_tools(
+            model_name=self.llm, input_messages=self.chat_history,
+            tools=tools, file_category=file_categories, company_name=company_name
         )
         self.chat_history.append({
             "role": "assistant",

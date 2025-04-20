@@ -35,7 +35,7 @@ dash.register_page(__name__, path="/projects/dashboard", name="AI Credit Report 
 # load company list
 company_list = get_company_list()
 # create the chatbot object that will save the chat history
-chatbot = ChatBot(llm="o1", reasoning_effort="high")
+chatbot = ChatBot(llm="gemini-2.5-flash-preview-04-17")
 
 
 def layout():
@@ -587,7 +587,7 @@ def parse_company_name_to_chatbot_system_user_prompt(num_clicks, company_name):
         chatbot_init_user_prompt = chatbot_init_user_prompt.replace("_COMPANY_NAME_", company_name)
 
         chatbot.chat_history.append({
-            "role": "developer",
+            "role": "model",
             "content": [{"type": "input_text", "text": chatbot_system_prompt}]
         })
 
@@ -621,7 +621,6 @@ def handle_chat(num_clicks, company_name, user_prompt):
     if num_clicks > 0:
         if user_prompt:
             _, _ = chatbot.generate_response(company_name=company_name, user_prompt=user_prompt)
-                # model_name="o1", reasoning_effort="high", chat_history=chatbot.chat_history,
             return 0, "", None, json.dumps(
                 [
                     msg for msg in chatbot.chat_history
@@ -750,7 +749,6 @@ def parse_credit_report_to_vector_db(num_clicks, company_name):
         client_wv = weaviate.connect_to_weaviate_cloud(
             cluster_url=os.getenv("WEAVIATE_URL"),
             auth_credentials=Auth.api_key(os.getenv("WEAVIATE_API_KEY")),
-            # headers={'X-OpenAI-Api-key': os.getenv("OPENAI_API_KEY")}
         )
         # collection name
         mt_col_name = "Companies"

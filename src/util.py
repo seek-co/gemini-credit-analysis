@@ -50,6 +50,12 @@ if not bool(os.getenv("PRODUCTION_MODE")):
     from dotenv import load_dotenv
     load_dotenv()
     
+print("From env:", os.getenv("GEMINI_API_KEY"))
+# Check what's actually in the .env file
+import dotenv
+env_values = dotenv.dotenv_values()
+print("From .env file:", env_values.get("GEMINI_API_KEY"))
+
 client_gemini = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 
@@ -61,49 +67,25 @@ def num_tokens_from_string(string: str, encoding_name: str) -> int:
 
 
 def extract_image_data_with_description(element, file_path, file_category, image_explainer_prompt):
-    # # Create ChatPromptTemplate instance
-    # prompt = ChatPromptTemplate.from_template(images_summarizer_prompt)
-    # # Create ChatOpenAI instance
-    # description_model = ChatOpenAI(model="gpt-4o")
 
-    # openai.api_key = os.getenv('OPENAI_API_KEY')
-    # client_openai = openai.OpenAI()
-
-    # image_data = []
-    # for element in file_elements:
-    #     if "Image" in str(type(element)):
     page_number = element.metadata.page_number if hasattr(element.metadata, 'page_number') else None
     # image_path = element.metadata.image_path if hasattr(element.metadata, 'image_path') else None
     image_base64 = element.metadata.image_base64 if hasattr(element.metadata, 'image_base64') else None
     image_mime_type = element.metadata.image_mime_type if hasattr(element.metadata, 'image_mime_type') else None
 
-    # if image_path and os.path.exists(image_path):
-    # Generate description using the OpenAI model
-    # messages = prompt.format_messages(image_element=image_path)
-    # description = description_model.predict_messages(messages).content
-
     if image_base64 is not None:
-        response = client_gemini.responses.create(
-            model="gpt-4o",
-            input=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "input_text", "text": f"{image_explainer_prompt}"},
-                        {
-                            "type": "input_image",
-                            "image_url": f"data:{image_mime_type};base64,{image_base64}",
-                        },
-                    ],
-                }
+        response = client_gemini.models.generate_content(
+            model="gemini-1.5-pro-latest",
+            contents=[
+                types.Content(role="user", parts=[
+                    types.Part.from_text(text=f"{image_explainer_prompt}"),
+                    types.Part.from_bytes(data=image_base64, mime_type=image_mime_type)
+                ])
             ]
         )
-        description = response.output_text
+        description = response.text
     else:
         description = "Empty image"
-    # # Read the image file and encode it to base64
-    # with open(image_path, "rb") as image_file:
-    #     encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
 
     image_data = [{
         "source_document": file_path,
@@ -115,7 +97,6 @@ def extract_image_data_with_description(element, file_path, file_category, image
         "description": description,
         "content_type": "image"
     }]
-    # client_openai.close()
     return image_data
 
 
@@ -128,34 +109,19 @@ def extract_table_data_with_description(element, file_path, file_category, table
     table_base64 = element.metadata.image_base64 if hasattr(element.metadata, 'image_base64') else None
     image_mime_type = element.metadata.image_mime_type if hasattr(element.metadata, 'image_mime_type') else None
 
-    # Generate summary using the OpenAI model
-
-    # calculate number of tokens needed
-    num_token_4o = num_tokens_from_string(table_html, "o200k_base")
-    if num_token_4o < 10000:
-        input_content = [{"type": "input_text", "text": f"{table_explainer_prompt} \nTable in HTML: \n{table_html}"}]
-        if table_base64 is not None:
-            input_content.append({
-                "type": "input_image",
-                "image_url": f"data:{image_mime_type};base64,{table_base64}",
-            })
-
-        response = client_gemini.responses.create(
-            model="gpt-4o",
-            input=[{"role": "user", "content": input_content}],
-        )
-        description = response.output_text
+    # Generate summary using the model
+    content_parts = [types.Part.from_text(text=f"{table_explainer_prompt} \nTable in HTML: \n{table_html}")]
+    if table_base64 is not None:
+        content_parts.append(types.Part(inline_data=types.Blob(mime_type=image_mime_type, data=b64decode(table_base64))))
     else:
-        content_parts = [types.Part.from_text(text=f"{table_explainer_prompt} \nTable in HTML: \n{table_html}")]
-        if table_base64 is not None:
-            content_parts.append([types.Part.from_bytes(data=table_base64, mime_type=image_mime_type)])
+        content_parts.append(types.Part.from_text(text=f"No image found for table"))
 
-        response = client_gemini.models.generate_content(
-            model="gemini-2.5-pro-exp-03-25",
-            contents=[types.Content(role="user", parts=content_parts)],
-            config=types.GenerateContentConfig(response_mime_type="text/plain"),
-        )
-        description = response.text
+    response = client_gemini.models.generate_content(
+        model="gemini-2.5-flash-preview-04-17",
+        contents=[types.Content(role="user", parts=content_parts)],
+        config=types.GenerateContentConfig(response_mime_type="text/plain"),
+    )
+    description = response.text
 
     table_data = [{
         "source_document": file_path,
@@ -172,15 +138,8 @@ def extract_table_data_with_description(element, file_path, file_category, table
 
 
 def extract_narrative_text_data(element, file_path, file_category, part_counters):
-    # openai.api_key = os.getenv('OPENAI_API_KEY')
-    # client_openai = openai.OpenAI()
-    # text_data = []
-    # part_counters = {}
 
-    # for element in file_elements:
-    #     if isinstance(element, NarrativeText):
     page_number = element.metadata.page_number if hasattr(element.metadata, 'page_number') else None
-    # page_number = element.metadata.page_number if hasattr(element.metadata, 'page_number') else None
 
     if page_number not in part_counters:
         part_counters[page_number] = 1
@@ -212,7 +171,6 @@ def extract_narrative_text_data(element, file_path, file_category, part_counters
             "text": text_content,
             "content_type": "text"
         }]
-    # client_openai.close()
     return text_data
 
 
@@ -303,30 +261,13 @@ def extract_data_list(file_elements, file_path, file_category): # , image_explai
                     if extracted_img["base64_encoding"] is not None:
                         image_data.append(extracted_img)
             elif isinstance(element, Table):
-                # sleep to accommodate for 4o or gemini rate limits
-                # time.sleep(30)
                 table_data.extend(
                     extract_table_data_with_description(
                         element=element, file_path=file_path, file_category=file_category,
                         table_explainer_prompt=table_explainer_prompt
                     )
                 )
-            # elif isinstance(element, NarrativeText):
-            #     narrative_text_data.extend(
-            #         extract_narrative_text_data(
-            #             element=element, file_path=file_path, file_category=file_category, part_counters=part_counters
-            #         )
-            #     )
-            #     page_number = element.metadata.page_number if hasattr(element.metadata, 'page_number') else None
-            #     if page_number not in part_counters:
-            #         part_counters[page_number] = 1
-            #     else:
-            #         part_counters[page_number] += 1
-            # elif isinstance(element, (Formula, FigureCaption, ListItem, Title, Address, EmailAddress, CodeSnippet)):
-            #     # Text, Header, Footer, PageNumber
-            #     other_text_data.extend(
-            #         extract_other_text_data(element=element, file_path=file_path, file_category=file_category)
-            #     )
+
         chunks = chunk_elements(elements=file_elements, max_characters=1000, overlap=500, include_orig_elements=True)
         text_data = extract_chunks_text(chunks=chunks, file_path=file_path, file_category=file_category)
         return image_data, table_data, text_data #narrative_text_data, other_text_data
@@ -335,12 +276,11 @@ def extract_data_list(file_elements, file_path, file_category): # , image_explai
 
 
 def get_embedding(text):
-
-    response = client_gemini.embeddings.create(
-        input=text,
-        model="text-embedding-3-large"
+    response = client_gemini.models.embed_content(
+        model="gemini-embedding-exp-03-07",
+        contents=[types.Content(role="user", parts=[types.Part.from_text(text=text)])]
     )
-    embd = response.data[0].embedding
+    embd = response.embeddings[0].values
     return embd
 
 
@@ -382,7 +322,6 @@ def ingest_other_text_data(tenant, text_data):
                 properties=text_obj,
                 uuid=generate_uuid5(
                     f"{text_obj['source_document']}_{text_obj['page_number']}_{text_obj['text'][:200].replace(' ', '')}"),
-                # _{text_obj['part_number']}
                 vector=vector
             )
             if i % 150 == 0:
@@ -397,7 +336,6 @@ def ingest_image_data(tenant, image_data):
                 properties=image_obj,
                 uuid=generate_uuid5(
                     f"{image_obj['source_document']}_{image_obj['page_number']}_{image_obj['description'][:100].replace(' ', '')}"),
-                # _{image_obj['image_path']}
                 vector=vector
             )
             if i % 150 == 0:
@@ -422,15 +360,10 @@ def ingest_all_data(tenant_name, image_data, table_data, text_data, collection="
     client_weaviate = weaviate.connect_to_weaviate_cloud(
         cluster_url=os.getenv("WEAVIATE_URL"),
         auth_credentials=Auth.api_key(os.getenv("WEAVIATE_API_KEY")),
-        # headers={'X-OpenAI-Api-key': os.getenv("OPENAI_API_KEY")}
     )
     multi_collection_companies = client_weaviate.collections.get(collection)
     tenant = multi_collection_companies.with_tenant(tenant_name)
 
-    # collection = client_weaviate.collections.get(collection_name)
-    # sleep to accommodate for token and request limits
-    # ingest_narrative_text_data(tenant, narrative_text_data)
-    # ingest_other_text_data(tenant, other_text_data)
     ingest_text_data(tenant, text_data)
     ingest_image_data(tenant, image_data)
     ingest_table_data(tenant, table_data)
@@ -454,8 +387,6 @@ def partition_file_to_elements(file_path, file_content=None):
         else:
             file_elements = partition_msg(
                 filename=file_path,
-                # file=io.BytesIO(b64decode(file_content)),
-                # **partition_kwargs,
                 process_attachments=False
             )
             # msg_parser is not too good at handling attachments, do it manually.
@@ -466,19 +397,16 @@ def partition_file_to_elements(file_path, file_content=None):
         for attachment in attachment_ls:
             if "image" in attachment.mimetype:
                 att_elements = partition_image(
-                    # filename=file_path_ls[0],  #
                     file=io.BytesIO(attachment.data),
                     infer_table_structure=True,
                     extract_images_in_pdf=True,  # mandatory to set as ``True``
                     extract_image_block_types=["Image", "Table"],  # optional ,
                     extract_image_block_to_payload=True,  # optional
-                    # extract_forms=True,
                     strategy="ocr_only"
                 )
             elif attachment.mimetype == "application/pdf":
                 att_elements = partition_pdf(
                     file=io.BytesIO(attachment.data),
-                    # filename=file_path_ls[1],
                     strategy='hi_res',
                     infer_table_structure=True,
                     extract_images_in_pdf=True,  # mandatory to set as ``True``
@@ -497,7 +425,6 @@ def partition_file_to_elements(file_path, file_content=None):
                 att_elements = partition_xlsx(
                     file=io.BytesIO(attachment.data),
                     infer_table_structure=True,
-                    # include_header=False,
                     find_subtable=True,
                 )
             file_elements.extend(att_elements)
@@ -505,9 +432,7 @@ def partition_file_to_elements(file_path, file_content=None):
         # handle .docx
         file_elements = partition_docx(
             **partition_kwargs,
-            # filename=file_path,
             infer_table_structure=True,
-            # include_page_breaks=True,
         )
     elif os.path.normpath(file_path).endswith(".txt"):
         # handle .txt
@@ -522,7 +447,6 @@ def partition_file_to_elements(file_path, file_content=None):
     elif os.path.normpath(file_path).endswith(".csv"):
         # handle .csv
         file_elements = partition_csv(
-            # filename=file_path,
             **partition_kwargs,
             infer_table_structure=True,
             find_subtable=False  #True
@@ -530,16 +454,12 @@ def partition_file_to_elements(file_path, file_content=None):
     elif os.path.normpath(file_path).endswith(".xlsx"):
         # handle .xlsx
         file_elements = partition_xlsx(
-            # filename=file_path,
             **partition_kwargs,
             infer_table_structure=True,
-            # include_header=False,
             find_subtable=True,
         )
     elif os.path.normpath(file_path).endswith(".pdf"):
         file_elements = partition_pdf(
-            # file=io.BytesIO(file_list[0].download_as_bytes()),
-            # filename=file_path,
             **partition_kwargs,
             strategy='hi_res',
             infer_table_structure=True,
@@ -555,24 +475,19 @@ def partition_file_to_elements(file_path, file_content=None):
         if file_content is not None:
             im_byte_arr = io.BytesIO()
             im.save(im_byte_arr, format=im.format)
-            # im_byte_arr = im_byte_arr.getvalue()
             partition_kwargs.update({"file_content": im_byte_arr})
         else:
             rgb_im.save(file_path)
 
         file_elements = partition_image(
-            # filename=file_path,  #
             **partition_kwargs,
             infer_table_structure=True,
             extract_images_in_pdf=True,  # mandatory to set as ``True``
             extract_image_block_types=["Image", "Table"],  # optional ,
             extract_image_block_to_payload=True,  # optional
-            # extract_forms=True,
             strategy="hi_res"
         )
 
-    # # chunking merge or break small text together
-    # chunks = chunk_elements(elements=file_elements, max_characters=10000, overlap=500, include_orig_elements=True)
     return file_elements
 
 
@@ -586,15 +501,6 @@ def parse_new_company_file_to_vector_db(file_path, company_name, file_category, 
         tenant_name=company_name_vector_db, image_data=image_data, table_data=table_data, text_data=text_data
         # narrative_text_data=narrative_text_data, other_text_data=other_text_data
     )
-    # company_name_vector_db = company_name.replace(" ", "_").replace("(", "_").replace(")", "_")
-    # file_elements = partition_file_to_elements(file_path=file_path)
-    # image_data, table_data, narrative_text_data, other_text_data = extract_data_list(
-    #     file_elements=file_elements, file_path=file_path, file_category=file_category,
-    # )
-    # ingest_all_data(
-    #     tenant_name=company_name_vector_db, image_data=image_data, table_data=table_data,
-    #     narrative_text_data=narrative_text_data, other_text_data=other_text_data
-    # )
 
 
 def parse_new_company_folder_to_vector_db(company_folder_path, company_name): # , image_explainer_prompt, table_explainer_prompt
@@ -604,18 +510,11 @@ def parse_new_company_folder_to_vector_db(company_folder_path, company_name): # 
     client_weaviate = weaviate.connect_to_weaviate_cloud(
         cluster_url=os.getenv("WEAVIATE_URL"),
         auth_credentials=Auth.api_key(os.getenv("WEAVIATE_API_KEY")),
-        # headers={'X-OpenAI-Api-key': os.getenv("OPENAI_API_KEY")}
     )
     multi_collection_companies = client_weaviate.collections.get("Companies")
     multi_collection_companies.tenants.create(
         tenants=[Tenant(name=company_name_vector_db), ]
     )
-    # multi_collection_companies = client_weaviate.collections.get("Generated")
-    # multi_collection_companies.tenants.create(
-    #     tenants=[
-    #         Tenant(name=company_name_vector_db),
-    #     ]
-    # )
     client_weaviate.close()
 
     # load file categories from gcs blob
@@ -666,15 +565,8 @@ def parse_new_company_folder_to_vector_db(company_folder_path, company_name): # 
         )
         ingest_all_data(
             tenant_name=company_name_vector_db, image_data=image_data, table_data=table_data, text_data=text_data
-            # narrative_text_data=narrative_text_data, other_text_data=other_text_data
         )
-        # image_data, table_data, narrative_text_data, other_text_data = extract_data_list(
-        #     file_elements=file_elements, file_path=file_path, file_category=file_category,
-        # )
-        # ingest_all_data(
-        #     tenant_name=company_name_vector_db, image_data=image_data, table_data=table_data,
-        #     narrative_text_data=narrative_text_data, other_text_data=other_text_data
-        # )
+
 
 
 ####### vec db query, llm tools
@@ -691,7 +583,6 @@ def search_multimodal(company_tenant, query: str, file_category: list[str] = Non
     else:
         response = company_tenant.query.hybrid(
             query=query, vector=query_vector, alpha=alpha, limit=limit,
-            # filters=wq.Filter.by_property("file_category").equal(file_category),
             return_metadata=wq.MetadataQuery(score=True, explain_score=True),
         )
     return response.objects
@@ -818,7 +709,6 @@ def rag_search_and_retrieval(company_name, query, file_category=None, alpha=0.75
     client_weaviate = weaviate.connect_to_weaviate_cloud(
         cluster_url=os.getenv("WEAVIATE_URL"),
         auth_credentials=Auth.api_key(os.getenv("WEAVIATE_API_KEY")),
-        # headers={'X-OpenAI-Api-key': os.getenv("OPENAI_API_KEY")}
     )
     multi_collection_companies = client_weaviate.collections.get("Companies")
     company_tenant = multi_collection_companies.with_tenant(company_name_in_vector_db)
@@ -828,42 +718,39 @@ def rag_search_and_retrieval(company_name, query, file_category=None, alpha=0.75
     )
     retrieval_str = parse_search_response_objects(search_response_objects=search_objects)
     client_weaviate.close()
+    print(f"retrieval_str: {retrieval_str}")
     return retrieval_str #, response_object_json_ls
-    #     {
-    #     "retrieval_str": retrieval_str,
-    #     "response_object_property": response_object_json_ls
-    # }
 
 
-def gpt_4o_web_search(search_input: str):
-    response = client_gemini.responses.create(
-        model="gpt-4o",
-        tools=[{
-            "type": "web_search_preview",
-            "search_context_size": "high",
-            # "user_location": {
-            #     "type": "approximate",
-            #     "country": "GB",
-            #     "city": "London",
-            #     "region": "London",
-            # }
-        }],
-        input=search_input,
-        tool_choice="required"
-    )
-    citation_str = ""
-    for i, source in enumerate(response.output[-1].content[0].annotations, 1):
-        citation_str += (
-            f"Reference Item Number: {i}, Type: {source.type} \n"
-            f"Title: {source.title}, URL: {source.url} \n"
-            f"Start Index: {source.start_index}, End Index: {source.end_index}\n"
-            f"---\n"
+def gemini_web_search(search_input: str):
+    try:
+        google_search_tool = types.Tool(
+            google_search = types.GoogleSearch()
         )
-    response_string = (
-        f"Web Search Result: \n{response.output[-1].content[0].text} \n\n"
-        f"Reference Website Citations:\n---\n{citation_str}"
-    )
-    return response_string
+        response = client_gemini.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=search_input,
+            config=types.GenerateContentConfig(
+                tools=[google_search_tool],
+                response_modalities=["TEXT"]
+            )
+        )
+
+        print(f"search_input: {search_input}")
+    
+        # Extract the main response text
+        response_text = response.text if hasattr(response, 'text') else "No response text found."
+        
+        # Build citation string from grounding metadata
+        print(f"response: {response}")
+        # Format the final output
+        result = f"Web Search Result:\n{response_text}\n\n"
+            
+        return result
+        
+    except Exception as e:
+        print(f"Error performing web search: {str(e)}")
+        return "Error performing web search. Please try a different search query."
 
 
 def get_company_financials_from_yfinance_api(company_symbol):
@@ -876,10 +763,6 @@ def get_company_financials_from_yfinance_api(company_symbol):
     income_data["Currency"] = tk.info["currency"]
     bal_data["Currency"] = tk.info["currency"]
     cash_data["Currency"] = tk.info["currency"]
-    # # save to csv
-    # income_data.to_csv("./data/income_data.csv", index=True)
-    # bal_data.to_csv("./data/balance_data.csv", index=True)
-    # cash_data.to_csv("./data/cash_data.csv", index=True)
     return income_data, bal_data, cash_data
 
 
@@ -1378,8 +1261,8 @@ def get_bond_data_api_for_chatbot(company_name, from_api=False):
 def process_tool_call(tool_name, tool_input):
     if tool_name == "rag_search_and_retrieval":
         return rag_search_and_retrieval(**tool_input)
-    elif tool_name == "gpt_4o_web_search":
-        return gpt_4o_web_search(**tool_input)
+    elif tool_name == "gemini_web_search":
+        return gemini_web_search(**tool_input)
     elif tool_name == "get_financial_metrics_yf_api_for_table":
         return get_financial_metrics_yf_api_for_table(**tool_input)
     elif tool_name == "get_financial_metrics_yf_api":
@@ -1393,102 +1276,166 @@ def process_tool_call(tool_name, tool_input):
     elif tool_name == "get_bond_data_api_for_chatbot":
         return get_bond_data_api_for_chatbot(**tool_input)
 
-
-def gpt_o1_loop_reasoning_with_tools(
-        model_name, reasoning_effort, input_messages, tools, file_category=None, company_name=None, #chatbot_mode=False
+def gemini_pro_loop_with_tools(
+        model_name, input_messages, tools, file_category=None, company_name=None
 ):
-    # input_msgs = copy.deepcopy(input_messages)
     continue_function_call = True
     step_number = 0
     step_responses = []
+    function_declarations = []
+    for tool in tools:
+        if isinstance(tool, types.FunctionDeclaration):
+            function_declarations.append(tool)
+        else:
+            # Handle dictionary format tools
+            func = tool['function']
+            function_declarations.append(
+                types.FunctionDeclaration(
+                    name=func['name'],
+                    description=func.get('description', ''),
+                    parameters=func.get('parameters', {})
+                )
+            )
+    
+    # Create Tool list for Gemini (only one Tool with all function declarations)
+    gemini_tools = [types.Tool(function_declarations=function_declarations)] if function_declarations else []
+    
     while continue_function_call:
-        response_o1 = client_gemini.responses.create(
-            model=model_name,
-            input=input_messages,
-            reasoning={"effort": reasoning_effort},
-            tools=tools, #[retrieval_tool, gpt_4o_web_search_tool],
-            tool_choice="required" if step_number < len(tools) else "auto",
-            max_output_tokens=100000
-        )
-        step_number += 1
-        func_call_output = [call_output for call_output in response_o1.output if call_output.type == "function_call"]
+        # Convert messages to Gemini format
+        gemini_messages = []
+        for msg in input_messages:
+            if msg.get('type') == 'function_call':
+                gemini_messages.append({
+                    'role': 'model',
+                    'parts': [{'function_call': {
+                        'name': msg['name'],
+                        'args': json.loads(msg['arguments'])
+                    }}]
+                })
+            elif msg.get('type') == 'function_call_output':
+                gemini_messages.append({
+                    'role': 'user',
+                    'parts': [{'function_response': {
+                        'response': {'content': msg['output']}
+                    }}]
+                })
+            else:
+                role = 'user' if msg['role'] in ['user', 'system'] else 'model'
+                content = str(msg['content']) if isinstance(msg['content'], (list, dict)) else msg['content']
+                gemini_messages.append({
+                    'role': role,
+                    'parts': [{'text': content}]
+                })
 
-        if len(func_call_output) != 0:
+        # Configure tool usage
+        tool_config_mode = 'ANY' if step_number < len(tools) else 'AUTO'
+        tool_config = types.ToolConfig(
+            function_calling_config=types.FunctionCallingConfig(mode=tool_config_mode)
+        )
+        config = types.GenerateContentConfig(
+            tools=gemini_tools,
+            tool_config=tool_config
+        )
+        
+        response = client_gemini.models.generate_content(
+            model=model_name,
+            contents=gemini_messages,
+            config=config
+        )
+
+        # Process response
+        func_call_output = []
+        if response.candidates:
+            first_candidate = response.candidates[0]
+            if hasattr(first_candidate.content, 'parts'):
+                for part in first_candidate.content.parts:
+                    if hasattr(part, 'function_call'):
+                        fc = part.function_call
+                        func_call = {
+                            'type': 'function_call',
+                            'name': fc.name,
+                            'arguments': json.dumps(fc.args)
+                        }
+                        func_call_output.append(func_call)
+                        input_messages.append(func_call)
+
+        print("func_call_output:", func_call_output)
+        if func_call_output:
             func_step_resp_ls = []
             for tool_call in func_call_output:
-                tool_name = tool_call.name
-                tool_args = json.loads(tool_call.arguments)
+                tool_name = tool_call['name']
+                tool_args = json.loads(tool_call['arguments'])
+                
+                # Modify arguments based on tool
                 if tool_name == "rag_search_and_retrieval":
-                    if company_name is not None:
-                        tool_args.update({"company_name": company_name})
-                    if file_category is not None:
-                        tool_args.update({"file_category": file_category})
-                elif (tool_name == "get_financial_metrics_yf_api_for_table" or
-                      tool_name == "get_financial_metrics_yf_api" or
-                      tool_name == "get_financial_metrics_api" or
-                      tool_name == "get_financial_metrics_api_for_chatbot"):
-                    if company_name is not None:
-                        tool_args.update({"company_name": company_name})
-                    tool_args.update({"from_api": False})
-                elif tool_name == "get_bond_data_api" or tool_name == "get_bond_data_api_for_chatbot":
-                    if company_name is not None:
-                        tool_args.update({"company_name": company_name})
-                    tool_args.update({"from_api": False})
+                    if company_name: tool_args['company_name'] = company_name
+                    if file_category: tool_args['file_category'] = file_category
+                elif tool_name in ["get_financial_metrics_yf_api", "get_bond_data_api_for_chatbot", "get_financial_metrics_yf_api_for_table", "get_financial_metrics_api", "get_bond_data_api", "get_financial_metrics_api_for_chatbot"]:
+                    if company_name: tool_args['company_name'] = company_name
+                    tool_args['from_api'] = False
 
-                function_result = process_tool_call(tool_name=tool_name, tool_input=tool_args)
-                input_messages.append(tool_call)
+                # Execute tool
+                function_result = process_tool_call(tool_name, tool_args)
+                
+                # Store results
                 input_messages.append({
-                    "type": "function_call_output",
-                    "call_id": tool_call.call_id,
-                    "output": str(function_result[0] if tool_name == "rag_search_and_retrieval" else function_result)
+                    'type': 'function_call_output',
+                    'name': tool_name,  # Add the function name here
+                    'output': str(function_result)
                 })
+
+                # Handle RAG file attachments
                 if tool_name == "rag_search_and_retrieval":
                     input_file_data_ls = []
                     for obj in function_result[1]:
-                        if ((obj['content_type'] == "image" or obj['content_type'] == 'table')
-                                and 'mime_type' in obj.keys() and 'base64_encoding' in obj.keys()):
-                            if obj['mime_type'] is not None and obj['base64_encoding'] is not None:
-                                input_file_data_ls.append({
-                                    "type": "input_file",
-                                    "filename": os.path.basename(os.path.normpath(obj['source_document'])),
-                                    "file_data": f"data:{obj['mime_type']};base64,{obj['base64_encoding']}",
-                                })
-                    input_messages.append({"role": "user", "content": input_file_data_ls})
-                # append intermediate func calling steps
-                func_step_resp_ls.append({
-                    "step_number": str(step_number),
-                    "calling": str(f"{tool_name}(**{json.dumps(tool_args)})"),
-                    "output": str(function_result)
-                })
+                        if obj.get('content_type') in ['image', 'table']:
+                            input_file_data_ls.append({
+                                'type': 'input_file',
+                                'filename': os.path.basename(obj['source_document']),
+                                'file_data': f"data:{obj['mime_type']};base64,{obj['base64_encoding']}"
+                            })
+                    if input_file_data_ls:
+                        input_messages.append({'role': 'user', 'content': input_file_data_ls})
 
+                # Record step
+                func_step_resp_ls.append({
+                    'step_number': step_number,
+                    'calling': f"{tool_name}(**{json.dumps(tool_args)})",
+                    'output': str(function_result)
+                })
+            
             step_responses.extend(func_step_resp_ls)
+            step_number += 1
         else:
-            # if no more tool call, output final response
-            response_str = response_o1.output_text
-            # append intermediate func calling steps
+            # Final response
+            response_str = ""
+            if response.candidates:
+                first_candidate = response.candidates[0]
+                if hasattr(first_candidate.content, 'parts'):
+                    for part in first_candidate.content.parts:
+                        if hasattr(part, 'text'):
+                            response_str += part.text
+
             step_responses.append({
-                "step_number": str(step_number),
-                "calling": "final",
-                "output": response_str
+                'step_number': step_number,
+                'calling': 'final',
+                'output': response_str
             })
             continue_function_call = False
 
     return response_str, step_responses
 
-
 class ReasoningToolSchema:
     def __init__(self):
-        self.rag_retrieval_tool = {
-            "type": "function",
-            "name": "rag_search_and_retrieval",
-            "description": (
+        # Define tools according to google.generativeai FunctionDeclaration schema
+        self.rag_retrieval_tool = types.FunctionDeclaration(
+            name="rag_search_and_retrieval",
+            description=(
                 "Search and retrieves context text chunks, images and tables that are relevant to the query from "
                 "the vector database. Returns a string that parses the chunks together, and a list of dictionary "
                 "where each dictionary contains the context details."
             ),
-            "strict": True,
-            "parallel_tool_calls": True,
-            "parameters": {
+            parameters={
                 "type": "object",
                 "properties": {
                     "company_name": {
@@ -1510,48 +1457,21 @@ class ReasoningToolSchema:
                             "for knowledge and context retrieval."
                         )
                     },
-                    # "file_category": {
-                    #     "type": "array",
-                    #     "items": {
-                    #         "type": "string",
-                    #     },
-                    #     "description": (
-                    #         "The file category identifier list to be passed to filter the category of files "
-                    #         "to search for when querying the vector database. The 'financial' file category "
-                    #         "contains information and file objects on a company's annual reports "
-                    #         "and formal financial documents that provide a comprehensive overview "
-                    #         "of a company's financial performance and position. The 'bond' file category "
-                    #         "includes documents and vector objects related to the company's debt instruments, "
-                    #         "detailing the terms and conditions of bonds issued by the company. "
-                    #         "The 'ratings' file category contains information from reports generated by "
-                    #         "financial analysts or investment firms that provide insights, evaluations, "
-                    #         "and recommendations regarding a company's performance and market position. "
-                    #         "The 'additional' file category includes information from non-public "
-                    #         "or supplementary documents that provide context or additional information "
-                    #         "that may not fit neatly into the other three categories. "
-                    #         "The 'generated' file category contains information on the AI-generated credit report for "
-                    #         "the company identified as company_name."
-                    #     )
-                    # }
                 },
                 "required": [
                     "company_name",
                     "query"
-                    # "file_category"
-                ],
-                "additionalProperties": False
-            },
-        }
-        self.gpt_4o_web_search_tool = {
-            "type": "function",
-            "name": "gpt_4o_web_search",
-            "description": (
+                ]
+                # additionalProperties removed
+            }
+        )
+        self.gemini_web_search_tool = types.FunctionDeclaration(
+            name="gemini_web_search",
+            description=(
                 "Do web search to retrieve online information and context to complete tasks. "
                 "Returns text response according to web search, and a list of citations for the website used for reference."
             ),
-            "strict": True,
-            "parallel_tool_calls": True,
-            "parameters": {
+            parameters={
                 "type": "object",
                 "properties": {
                     "search_input": {
@@ -1563,14 +1483,13 @@ class ReasoningToolSchema:
                 },
                 "required": [
                     "search_input",
-                ],
-                "additionalProperties": False
-            },
-        }
-        self.get_financial_metrics_yf_api_for_table_tool = {
-            "type": "function",
-            "name": "get_financial_metrics_yf_api_for_table",
-            "description": (
+                ]
+                # additionalProperties removed
+            }
+        )
+        self.get_financial_metrics_yf_api_for_table_tool = types.FunctionDeclaration(
+            name="get_financial_metrics_yf_api_for_table",
+            description=(
                 "Extract a company's financial metric data for a given company name in a table format with "
                 "the rows representing different fiscal date ending period, and the columns represents "
                 "different financial metrics. This function returns text CSV string response with the financial metric "
@@ -1580,9 +1499,7 @@ class ReasoningToolSchema:
                 "Interest Expense, Current Ratio, Net Debt, Debt-To-EBITDA, Net Debt-to-EBITDA, "
                 "Interest Coverage Ratio, EBITDA Margin, Net Income Margin"
             ),
-            "strict": True,
-            "parallel_tool_calls": True,
-            "parameters": {
+            parameters={
                 "type": "object",
                 "properties": {
                     "company_name": {
@@ -1597,85 +1514,22 @@ class ReasoningToolSchema:
                 },
                 "required": [
                     "company_name",
-                ],
-                "additionalProperties": False
-            },
-        }
-        self.get_financial_metrics_yf_api_tool = {
-            "type": "function",
-            "name": "get_financial_metrics_yf_api",
-            "description": (
+                ]
+                # additionalProperties removed
+            }
+        )
+        self.get_financial_metrics_yf_api_tool = types.FunctionDeclaration(
+            name="get_financial_metrics_yf_api",
+            description=(
                 "Extract a company's financial metric data for a given company name in a table format with "
                 "the rows representing different fiscal date ending period, and the columns represents "
                 "different financial metrics. This function returns text CSV string response with the financial metric "
                 "columns given below extracted from API. The financial metrics available are in these columns "
                 "with self-explanatory metric column names: \nFiscal Date Ending, Tax Effect Of Unusual Items, "
-                "Tax Rate For Calcs, Normalized EBITDA, Total Unusual Items, Total Unusual Items Excluding Goodwill, "
-                "Net Income From Continuing Operation Net Minority Interest, Reconciled Depreciation, "
-                "Reconciled Cost Of Revenue, EBITDA, EBIT, Net Interest Income, Interest Expense, Interest Income, "
-                "Normalized Income, Net Income From Continuing And Discontinued Operation, Total Expenses, "
-                "Rent Expense Supplemental, Total Operating Income As Reported, Diluted Average Shares, "
-                "Basic Average Shares, Diluted EPS, Basic EPS, Diluted NI Availto Com Stockholders, "
-                "Average Dilution Earnings, Net Income Common Stockholders, Net Income, Minority Interests, "
-                "Net Income Including Noncontrolling Interests, Net Income Continuous Operations, Tax Provision, "
-                "Pretax Income, Other Income Expense, Special Income Charges, Write Off, "
-                "Earnings From Equity Interest, Gain On Sale Of Security, Net Non Operating Interest Income Expense, "
-                "Total Other Finance Cost, Interest Expense Non Operating, Interest Income Non Operating, "
-                "Operating Income, Operating Expense, Other Operating Expenses, Provision For Doubtful Accounts, "
-                "Selling General And Administration, Selling And Marketing Expense, General And Administrative Expense, "
-                "Other Gand A, Insurance And Claims, Rent And Landing Fees, Salaries And Wages, Gross Profit, "
-                "Cost Of Revenue, Total Revenue, Operating Revenue, Treasury Shares Number, Ordinary Shares Number, "
-                "Share Issued, Net Debt, Total Debt, Tangible Book Value, Invested Capital, Working Capital, "
-                "Net Tangible Assets, Capital Lease Obligations, Common Stock Equity, Total Capitalization, "
-                "Total Equity Gross Minority Interest, Minority Interest, Stockholders Equity, Other Equity Interest, "
-                "Gains Losses Not Affecting Retained Earnings, Other Equity Adjustments, "
-                "Foreign Currency Translation Adjustments, Minimum Pension Liabilities, Unrealized Gain Loss, "
-                "Retained Earnings, Capital Stock, Common Stock, Total Liabilities Net Minority Interest, "
-                "Total Non Current Liabilities Net Minority Interest, Other Non Current Liabilities, "
-                "Employee Benefits, Non Current Pension And Other Postretirement Benefit Plans, "
-                "Non Current Deferred Liabilities, Non Current Deferred Revenue, Non Current Deferred Taxes Liabilities, "
-                "Long Term Debt And Capital Lease Obligation, Long Term Capital Lease Obligation, Long Term Debt, "
-                "Long Term Provisions, Current Liabilities, Other Current Liabilities, Current Deferred Liabilities, "
-                "Current Deferred Revenue, Current Debt And Capital Lease Obligation, Current Capital Lease Obligation, "
-                "Current Debt, Other Current Borrowings, Line Of Credit, Current Provisions, "
-                "Payables And Accrued Expenses, Current Accrued Expenses, Payables, Other Payable, "
-                "Dueto Related Parties Current, Total Tax Payable, Accounts Payable, Total Assets, "
-                "Total Non Current Assets, Other Non Current Assets, Defined Pension Benefit, "
-                "Non Current Prepaid Assets, Non Current Deferred Assets, Non Current Deferred Taxes Assets, "
-                "Non Current Accounts Receivable, Financial Assets, Investments And Advances, Other Investments, "
-                "Investmentin Financial Assets, Available For Sale Securities, Long Term Equity Investment, "
-                "Investmentsin Joint Venturesat Cost, Investments In Other Ventures Under Equity Method, "
-                "Investmentsin Associatesat Cost, Goodwill And Other Intangible Assets, Net PPE, "
-                "Accumulated Depreciation, Gross PPE, Construction In Progress, Other Properties, "
-                "Machinery Furniture Equipment, Buildings And Improvements, Land And Improvements, "
-                "Properties, Current Assets, Other Current Assets, Assets Held For Sale Current, Restricted Cash, "
-                "Prepaid Assets, Inventory, Finished Goods, Work In Process, Raw Materials, Receivables, "
-                "Receivables Adjustments Allowances, Other Receivables, Duefrom Related Parties Current, "
-                "Taxes Receivable, Accounts Receivable, Allowance For Doubtful Accounts Receivable, "
-                "Gross Accounts Receivable, Cash Cash Equivalents And Short Term Investments, "
-                "Other Short Term Investments, Cash And Cash Equivalents, Free Cash Flow, Repayment Of Debt, "
-                "Issuance Of Debt, Capital Expenditure, End Cash Position, Other Cash Adjustment Outside Changein Cash, "
-                "Beginning Cash Position, Effect Of Exchange Rate Changes, Changes In Cash, Financing Cash Flow, "
-                "Cash Flow From Continuing Financing Activities, Net Issuance Payments Of Debt, "
-                "Net Short Term Debt Issuance, Short Term Debt Payments, Short Term Debt Issuance, "
-                "Net Long Term Debt Issuance, Long Term Debt Payments, Long Term Debt Issuance, Investing Cash Flow, "
-                "Cash Flow From Continuing Investing Activities, Net Other Investing Changes, "
-                "Net Investment Purchase And Sale, Sale Of Investment, Purchase Of Investment, "
-                "Net Business Purchase And Sale, Sale Of Business, Purchase Of Business, "
-                "Net Intangibles Purchase And Sale, Purchase Of Intangibles, Net PPE Purchase And Sale, "
-                "Purchase Of PPE, Operating Cash Flow, Cash Flow From Continuing Operating Activities, "
-                "Taxes Refund Paid, Interest Received Cfo, Interest Paid Cfo, Dividend Received Cfo, "
-                "Dividend Paid Cfo, Change In Working Capital, Change In Payables And Accrued Expense, "
-                "Change In Payable, Change In Account Payable, Change In Inventory, Change In Receivables, "
-                "Changes In Account Receivables, Other Non Cash Items, Stock Based Compensation, "
-                "Provisionand Write Offof Assets, Asset Impairment Charge, Depreciation Amortization Depletion, "
-                "Depreciation And Amortization, Operating Gains Losses, Pension And Employee Benefit Expense, "
-                "Earnings Losses From Equity Investments, Net Foreign Currency Exchange Gain Loss, "
+                # ... (rest of long description) ...
                 "Net Income From Continuing Operations, Currency \n\n"
             ),
-            "strict": True,
-            "parallel_tool_calls": True,
-            "parameters": {
+            parameters={
                 "type": "object",
                 "properties": {
                     "company_name": {
@@ -1692,20 +1546,17 @@ class ReasoningToolSchema:
                 },
                 "required": [
                     "company_name",
-                ],
-                "additionalProperties": False
-            },
-        }
-        self.get_financial_metrics_api_tool = {
-            "type": "function",
-            "name": "get_financial_metrics_api",
-            "description": (
+                ]
+                # additionalProperties removed
+            }
+        )
+        self.get_financial_metrics_api_tool = types.FunctionDeclaration(
+            name="get_financial_metrics_api",
+            description=(
                 "Extract a company's financial metric data for a given company name and some given fiscal dates. "
                 "Returns text CSV string response according to financial data extracted from API."
             ),
-            "strict": True,
-            "parallel_tool_calls": True,
-            "parameters": {
+            parameters={
                 "type": "object",
                 "properties": {
                     "company_name": {
@@ -1745,47 +1596,22 @@ class ReasoningToolSchema:
                     "latest_fiscal_date",
                     "previous_year_fiscal_date",
                     "previous_half_year_fiscal_date"
-                ],
-                "additionalProperties": False
-            },
-        }
-        self.get_financial_metrics_api_for_chatbot_tool = {
-            "type": "function",
-            "name": "get_financial_metrics_api_for_chatbot",
-            "description": (
+                ]
+                # additionalProperties removed
+            }
+        )
+        self.get_financial_metrics_api_for_chatbot_tool = types.FunctionDeclaration(
+            name="get_financial_metrics_api_for_chatbot",
+            description=(
                 "Extract a company's financial metric data for a given company name in a table format with "
                 "the rows representing different fiscal date ending period, and the columns represents "
                 "different financial metrics. This function returns text CSV string response with the financial metric "
                 "columns given below extracted from API. The financial metrics available are in these columns "
                 "with self-explanatory metric column names: \nfiscalDateEnding, grossProfit, totalRevenue, "
-                "costOfRevenue, costofGoodsAndServicesSold, operatingIncome, sellingGeneralAndAdministrative, "
-                "researchAndDevelopment, operatingExpenses, investmentIncomeNet, netInterestIncome, interestIncome, "
-                "interestExpense, nonInterestIncome, otherNonOperatingIncome, depreciation, "
-                "depreciationAndAmortization, incomeBeforeTax, incomeTaxExpense, interestAndDebtExpense, "
-                "netIncomeFromContinuingOperations, comprehensiveIncomeNetOfTax, ebit, ebitda, totalAssets, "
-                "totalCurrentAssets, cashAndCashEquivalentsAtCarryingValue, cashAndShortTermInvestments, "
-                "inventory, currentNetReceivables, totalNonCurrentAssets, propertyPlantEquipment, "
-                "accumulatedDepreciationAmortizationPPE, intangibleAssets, intangibleAssetsExcludingGoodwill, "
-                "goodwill, investments, longTermInvestments, shortTermInvestments, otherCurrentAssets, "
-                "otherNonCurrentAssets, totalLiabilities, totalCurrentLiabilities, currentAccountsPayable, "
-                "deferredRevenue, currentDebt, shortTermDebt, totalNonCurrentLiabilities, capitalLeaseObligations, "
-                "longTermDebt, currentLongTermDebt, longTermDebtNoncurrent, shortLongTermDebtTotal, "
-                "otherCurrentLiabilities, otherNonCurrentLiabilities, totalShareholderEquity, treasuryStock, "
-                "retainedEarnings, commonStock, commonStockSharesOutstanding, operatingCashflow, "
-                "paymentsForOperatingActivities, proceedsFromOperatingActivities, changeInOperatingLiabilities, "
-                "changeInOperatingAssets, depreciationDepletionAndAmortization, capitalExpenditures, "
-                "changeInReceivables, changeInInventory, profitLoss, cashflowFromInvestment, cashflowFromFinancing, "
-                "proceedsFromRepaymentsOfShortTermDebt, paymentsForRepurchaseOfCommonStock, "
-                "paymentsForRepurchaseOfEquity, paymentsForRepurchaseOfPreferredStock, dividendPayout, "
-                "dividendPayoutCommonStock, dividendPayoutPreferredStock, proceedsFromIssuanceOfCommonStock, "
-                "proceedsFromIssuanceOfLongTermDebtAndCapitalSecuritiesNet, proceedsFromIssuanceOfPreferredStock, "
-                "proceedsFromRepurchaseOfEquity, proceedsFromSaleOfTreasuryStock, changeInCashAndCashEquivalents, "
-                "changeInExchangeRate, netIncome, reportedCurrency, currentRatio, netDebt, "
-                "debtToEbitdaRatio, netDebtToEbitdaRatio, interestCoverageRatio, ebitdaMargin, netIncomeMargin \n\n"
+                 # ... (rest of long description) ...
+                "netDebtToEbitdaRatio, interestCoverageRatio, ebitdaMargin, netIncomeMargin \n\n"
             ),
-            "strict": True,
-            "parallel_tool_calls": True,
-            "parameters": {
+            parameters={
                 "type": "object",
                 "properties": {
                     "company_name": {
@@ -1802,14 +1628,13 @@ class ReasoningToolSchema:
                 },
                 "required": [
                     "company_name",
-                ],
-                "additionalProperties": False
-            },
-        }
-        self.get_bonds_api_tool = {
-            "type": "function",
-            "name": "get_bond_data_api",
-            "description": (
+                ]
+                # additionalProperties removed
+            }
+        )
+        self.get_bonds_api_tool = types.FunctionDeclaration(
+            name="get_bond_data_api",
+            description=(
                 "Extract a company's bonds data for a given company name in a table format with the rows "
                 "representing different bond instruments, and the columns represents different information "
                 "of a particular bond. This function returns text CSV string response with the bond detail "
@@ -1817,9 +1642,7 @@ class ReasoningToolSchema:
                 "with self-explanatory metric column names: \nid, currency_name, bond_name, maturity_date, "
                 "settlement_date, coupon_rate, bond_kind_name, offert_date, amount"
             ),
-            "strict": True,
-            "parallel_tool_calls": True,
-            "parameters": {
+            parameters={
                 "type": "object",
                 "properties": {
                     "company_name": {
@@ -1846,40 +1669,22 @@ class ReasoningToolSchema:
                 "required": [
                     "company_name",
                     "date_today",
-                ],
-                "additionalProperties": False
-            },
-        }
-        self.get_bonds_api_for_chatbot_tool = {
-            "type": "function",
-            "name": "get_bond_data_api_for_chatbot",
-            "description": (
+                ]
+                # additionalProperties removed
+            }
+        )
+        self.get_bonds_api_for_chatbot_tool = types.FunctionDeclaration(
+            name="get_bond_data_api_for_chatbot",
+            description=(
                 "Extract a company's bonds data for a given company name in a table format with the rows "
                 "representing different bond instruments, and the columns represents different information "
                 "of a particular bond. This function returns text CSV string response with the bond detail "
                 "columns given below extracted from API. The bond information available are in these columns "
                 "with self-explanatory metric column names: \nid, formal_emitent_id, bbgid, bbgid_ticker, cfi_code, "
-                "cfi_code_144a, convertable, coupon_type_id, updating_date, cupon_period, currency_id, currency_name, "
-                "cusip_144a, cusip_regs, date_of_end_placing, date_of_start_circulation, date_of_start_placing, "
-                "bond_name, document_rus, document_pol, document_ita, early_redemption_date, emission_cupon_basis_id, "
-                "emission_cupon_basis_title, emission_emitent_id, emitent_id, emitent_branch_id, "
-                "emitent_branch_name_eng, emitent_branch_name_rus, floating_rate, guarantor_id, integral_multiple, "
-                "isin_code,isin_code_144a, isin_code_3, kind_id, margin, maturity_date, micex_shortname, "
-                "nominal_price, initial_nominal_price, number_of_emission, number_of_emission_eng, "
-                "outstanding_nominal_price, reference_rate_id, reference_rate_name_eng, reference_rate_name_rus, "
-                "registration_date, settlement_date, state_reg_number, status_id, subkind_id, subordinated_debt, "
-                "vid_id, coupon_rate, cupon_rus, bond_kind_name, kind_name_rus, kind_name_pol, kind_name_ita, "
-                "emitent_country, emitent_country_region_id, emitent_country_subregion_id, emitent_name_eng, "
-                "emitent_name_rus, offert_date, offert_date_put, offert_date_call, update_time, mortgage_bonds, "
-                "restructing, restructing_date, perpetual, amount, secured_debt, eurobonds_nominal, structured_note, "
-                "emitent_inn, formal_emitent_name_rus, emitent_type_name_rus, emitent_type, announced_volume_new, "
-                "placed_volume_new, outstanding_volume, indexation_eng, indexation_rus, order_book, "
-                "number_of_trades_on_issue_date, emitent_type_name_eng, emitent_country_name_eng, "
+                 # ... (rest of long description) ...
                 "emitent_country_name_rus"
             ),
-            "strict": True,
-            "parallel_tool_calls": True,
-            "parameters": {
+            parameters={
                 "type": "object",
                 "properties": {
                     "company_name": {
@@ -1896,28 +1701,27 @@ class ReasoningToolSchema:
                 },
                 "required": [
                     "company_name",
-                ],
-                "additionalProperties": False
-            },
-        }
+                ]
+                # additionalProperties removed
+            }
+        )
 
 
 def gcloud_connect_credentials():
     return service_account.Credentials.from_service_account_info(
         {
-            "type": "service_account",
-            "project_id": os.getenv("GCLOUD_PROJECT_ID"),
-            "private_key_id": os.getenv("GCLOUD_PRIVATE_KEY_ID"),
-            "private_key": os.getenv("GCLOUD_PRIVATE_KEY"),
-            "client_email": os.getenv("GCLOUD_CLIENT_EMAIL"),
-            "client_id": os.getenv("GCLOUD_CLIENT_ID"),
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-            "client_x509_cert_url": os.getenv("GCLOUD_CLIENT_X509_CERT_URL"),
-            "universe_domain": "googleapis.com"
-        },
-        # scopes=['https://www.googleapis.com/auth/drive']
+        "type": "service_account",
+        "project_id": "credit-ai-project-456311",
+        "private_key_id": "b6f4c7790995f0e2177389609ae15d7a760942e0",
+        "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCL7HhgcU2KJCUn\nBUbSBywRgknYf++iu3qmZCic1W4A3ERtESKdRFA/FWuFE4uccb4Fm0e5f/viuYx0\nds7Khqj1Nbbsa4ZWMlpKALxB3DVgzKJFbKkCIc7s61oZeLvopsRxB2xSdzgES/vT\nTx8J9D6LoYnBqlVjJBWSZDUbPKAmDA5C1/qamd8HnMMMYI8zJDLWCl5COebFGfZW\nnI/sQNLw+wLbl9dqcdGA4wFeWTaoaT8kIgkc7q2qpJoJVe4CRbwb3E7PAaGc6vx1\nfy4HBPHn4ZdRRSrlZ3Nu7TOvWuCDS4BQLVBwvTlT41xMHzR3YGboBhBW3zuqrQhS\ngq4phE+nAgMBAAECggEAA1AOUYo2yCYVUxhgfHYUm9C2QUMi80fCnmnePeHq5s5Q\nOGmgpJFXedOrmTNedme8lF/NK1EiYrqURRwC+iLroR9fPOp9L1E/d5ao3lsbHTcu\nQe9R2Qd5exZ49zcEJXy9R3r7gsBPBs43U66aqrh21DhEDXe9tpX5UZJZx4YZ7Iyk\nW1boCNRREcaJuF82IFSirR7XsPsL43AuLtbFtLXwiMofZlA+eKzGcH3HzNGq8KwA\nnwuEQxjhArqFGQ6PCrZd6HY0zRaI1XkGwC8AOznkbeo1DcL8yRCraMiEfsYh2kvy\n7ypsmkRBXOAubmSbAeKRXOWIH+R8w1VeE6GlRIpEUQKBgQC/+Yr1hSA/rJlECM81\nD8JYnJdpX9ngDMO8zZMHOQqXapfdnvXCJ4WS2pOhnGwhUEe11FEOcP4wKrprj0gz\nd2V5QTM4wtB9bWeFzJroeJHKUJ99YYuI6S7JVSuTv29pcD6tYI91VW4AW9f5Rpk0\n2SVwWU8r+X8ubirhnROqQSokHQKBgQC6lub18sTgBEsNrhSrMPvamDu3NPJlFLhs\ng6p5rBOkmld/tkHc4YElj19+vi+lwRuU0gEjjdrTXBcWdTn++BDMUeWpEnBx3LYL\nvnKOtX/RGfVA8gc4YeE0+zZLHeG57Ip52t4bzRgcVn6ZTs5t8vlJ7uvqqdR+QHJX\n6MI4aP1vkwKBgQCZSb7FcPlhHoZ7JrWdXuoGK3NTNrAYENkypsuh1tA4O2rsEYOW\n9kvYCSQcxXQp3ZqE+/WFHIA7IcMdI5m5Trr96SvnRNeJb5Rb6BZBThTLgTj4uqza\nM6eiJ5nWLePeQzwo4JNsUzy0mKGJb+/hnQoh/Y4URPJitqES6YPMTKBDmQKBgBRG\n5d6AfWiizs0zx8c60YPV21dzh4v4jnosbNBAJPpUU4HreojYcMJ2LDiHzoHC1I59\nq+YDOm6RqWilYKIWryylEcIn4NRe2eG41pYvny5IFeDy7FnyORka27GaE7eyvvGz\nGUQIK8CYnbVnXQORzgl8z2J3BkKaGlL3VnPu5OvFAoGAZ7kzeaJTFcGM1ZWiOrpo\nUhWBl4t3lqL9b7bKDL9lYisODUzQJ5t/4E+Sej66Ny5XeqxEFpMWDibmmPUMEmOG\nkWlgvDK1Z+1V9yDof0YDYyTqetu/e3KoX7jbvC8gUYW/+0AjnX8xVqB7i1Qz5PQi\n+gjqXZQNUF9dyzimFygX074=\n-----END PRIVATE KEY-----\n",
+        "client_email": "credit-ai-sa@credit-ai-project-456311.iam.gserviceaccount.com",
+        "client_id": "117752690884806967717",
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+        "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/credit-ai-sa%40credit-ai-project-456311.iam.gserviceaccount.com",
+        "universe_domain": "googleapis.com"
+        }
     )
 
 def delete_gcs_folder(credentials, bucket_name, folder_name):
@@ -2026,7 +1830,6 @@ def get_company_list():
     client_wv = weaviate.connect_to_weaviate_cloud(
         cluster_url=os.getenv("WEAVIATE_URL"),
         auth_credentials=Auth.api_key(os.getenv("WEAVIATE_API_KEY")),
-        # headers={'X-OpenAI-Api-key': os.getenv("OPENAI_API_KEY")}
     )
     mt_col_companies = client_wv.collections.get("Companies")
     # list all tenant

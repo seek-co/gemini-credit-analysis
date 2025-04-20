@@ -13,7 +13,7 @@ from google.genai import types
 from google.cloud import storage
 
 from src.util import (
-    ReasoningToolSchema, process_files_content_parts, gpt_o1_loop_reasoning_with_tools, gcloud_connect_credentials
+    ReasoningToolSchema, process_files_content_parts, gemini_pro_loop_with_tools, gcloud_connect_credentials
 )
 
 # load .env if not in production
@@ -45,7 +45,7 @@ class CreditReportGenerate:
             "Do NOT include any extra comments and explanation."
         )
         response_date = client_gm.models.generate_content(
-            model="gemini-2.5-pro-exp-03-25",
+            model="gemini-2.5-flash-preview-04-17",
             contents=date_prompt_msg,
             config=types.GenerateContentConfig(
                 tools=[types.Tool(google_search=types.GoogleSearch())],
@@ -91,7 +91,7 @@ class CreditReportGenerate:
             "response_mime_type": "text/plain",
         }
         model_fin_prd = GenerativeModel(
-            model_name="gemini-2.5-pro-exp-03-25",
+            model_name="gemini-2.5-flash-preview-04-17",
             generation_config=generation_config,
         )
         user_prompt = (
@@ -150,9 +150,9 @@ class CreditReportGenerate:
                 "content": [{"type": "input_text", "text": user_prompt}]
             }
         ]
-        response, _ = gpt_o1_loop_reasoning_with_tools(
+        response, _ = gemini_pro_loop_with_tools(
             model_name="o1", reasoning_effort="high", input_messages=initial_input_messages,
-            tools=[tl.gpt_4o_web_search_tool, tl.rag_retrieval_tool],
+            tools=[tl.gemini_web_search_tool, tl.rag_retrieval_tool],
             file_category=["ratings", "financial", "bond", "additional"],
             company_name=self.company_name
         )
@@ -205,7 +205,7 @@ class CreditReportGenerate:
         )
         initial_input_messages = [
             {
-                "role": "developer",
+                "role": "model",
                 "content": [{"type": "input_text", "text": exec_summary_prompt}]
             },
             {
@@ -218,11 +218,11 @@ class CreditReportGenerate:
                 ]
             },
         ]
-        summary_response, summary_step_outputs = gpt_o1_loop_reasoning_with_tools(
+        summary_response, summary_step_outputs = gemini_pro_loop_with_tools(
             model_name="o1",
             reasoning_effort="high",
             input_messages=initial_input_messages,
-            tools=[tl.rag_retrieval_tool, tl.gpt_4o_web_search_tool, tl.get_financial_metrics_yf_api_tool],
+            tools=[tl.rag_retrieval_tool, tl.gemini_web_search_tool, tl.get_financial_metrics_yf_api_tool],
             file_category=["financial", "ratings"]
         )
         # add to class dict
@@ -246,14 +246,14 @@ class CreditReportGenerate:
         )
         initial_input_messages = [
             {
-                "role": "developer",
+                "role": "model",
                 "content": [{"type": "input_text", "text": business_overview_prompt}]
             }
         ]
         tools = [
-            tl.rag_retrieval_tool, tl.gpt_4o_web_search_tool, tl.get_financial_metrics_yf_api_tool,
+            tl.rag_retrieval_tool, tl.gemini_web_search_tool, tl.get_financial_metrics_yf_api_tool,
         ]
-        response, step_outputs = gpt_o1_loop_reasoning_with_tools(
+        response, step_outputs = gemini_pro_loop_with_tools(
             model_name="o1", reasoning_effort="high", input_messages=initial_input_messages, tools=tools,
             file_category=["ratings", "financial"],
             company_name=self.company_name
@@ -291,7 +291,7 @@ class CreditReportGenerate:
 
         initial_input_messages_1 = [
             {
-                "role": "developer",
+                "role": "model",
                 "content": [{"type": "input_text", "text": fin_system_prompt}]
             },
             {
@@ -300,17 +300,17 @@ class CreditReportGenerate:
             },
         ]
         tools = [
-            tl.rag_retrieval_tool, tl.gpt_4o_web_search_tool, tl.get_financial_metrics_yf_api_for_table_tool,
+            tl.rag_retrieval_tool, tl.gemini_web_search_tool, tl.get_financial_metrics_yf_api_for_table_tool,
         ]
         # Step 1: create metric tables
-        fin_health_response_1, fin_health_step_outputs_1 = gpt_o1_loop_reasoning_with_tools(
+        fin_health_response_1, fin_health_step_outputs_1 = gemini_pro_loop_with_tools(
             model_name="o1", reasoning_effort="high", input_messages=initial_input_messages_1, tools=tools,
             file_category=["financial", "ratings", "additional"], company_name=self.company_name
         )
         # Step 2: write analysis
         initial_input_messages_2 = [
             {
-                "role": "developer",
+                "role": "model",
                 "content": [{"type": "input_text", "text": fin_system_prompt}]
             },
             {
@@ -321,7 +321,7 @@ class CreditReportGenerate:
                 ]
             },
         ]
-        fin_health_response_2, fin_health_step_outputs_2 = gpt_o1_loop_reasoning_with_tools(
+        fin_health_response_2, fin_health_step_outputs_2 = gemini_pro_loop_with_tools(
             model_name="o1", reasoning_effort="high", input_messages=initial_input_messages_2, tools=tools,
             file_category=["financial", "ratings"], company_name=self.company_name
         )
@@ -367,11 +367,11 @@ class CreditReportGenerate:
 
         debt_tables_str = ""
         debt_step_outputs = []
-        tools = [tl.rag_retrieval_tool, tl.gpt_4o_web_search_tool, tl.get_bonds_api_for_chatbot_tool]
+        tools = [tl.rag_retrieval_tool, tl.gemini_web_search_tool, tl.get_bonds_api_for_chatbot_tool]
         # Step 1: create table for bond series
         initial_input_messages_1 = [
             {
-                "role": "developer",
+                "role": "model",
                 "content": [{"type": "input_text", "text": system_prompt}]
             },
             {
@@ -379,7 +379,7 @@ class CreditReportGenerate:
                 "content": [{"type": "input_text", "text": user_prompt_1_table1_bond}]
             },
         ]
-        response_1, step_outputs_1 = gpt_o1_loop_reasoning_with_tools(
+        response_1, step_outputs_1 = gemini_pro_loop_with_tools(
             model_name="o1",
             reasoning_effort="high",
             input_messages=initial_input_messages_1,
@@ -391,7 +391,7 @@ class CreditReportGenerate:
         # Step 2: create table for g3 debt
         initial_input_messages_2 = [
             {
-                "role": "developer",
+                "role": "model",
                 "content": [{"type": "input_text", "text": system_prompt}]
             },
             {
@@ -402,7 +402,7 @@ class CreditReportGenerate:
                 ]
             },
         ]
-        response_2, step_outputs_2 = gpt_o1_loop_reasoning_with_tools(
+        response_2, step_outputs_2 = gemini_pro_loop_with_tools(
             model_name="o1",
             reasoning_effort="high",
             input_messages=initial_input_messages_2,
@@ -414,7 +414,7 @@ class CreditReportGenerate:
         # Step 3: create table for local debt
         initial_input_messages_3 = [
             {
-                "role": "developer",
+                "role": "model",
                 "content": [{"type": "input_text", "text": system_prompt}]
             },
             {
@@ -426,11 +426,11 @@ class CreditReportGenerate:
                 ]
             },
         ]
-        response_3, step_outputs_3 = gpt_o1_loop_reasoning_with_tools(
+        response_3, step_outputs_3 = gemini_pro_loop_with_tools(
             model_name="o1",
             reasoning_effort="high",
             input_messages=initial_input_messages_3,
-            tools=[tl.rag_retrieval_tool, tl.gpt_4o_web_search_tool],
+            tools=[tl.rag_retrieval_tool, tl.gemini_web_search_tool],
             file_category=["ratings", "bond"]
         )
         debt_tables_str += "\n\n" + re.sub("```.+\n|```\n|```", "", response_3)
@@ -438,7 +438,7 @@ class CreditReportGenerate:
         # Step 4: create table for debt maturity wall
         initial_input_messages_4 = [
             {
-                "role": "developer",
+                "role": "model",
                 "content": [{"type": "input_text", "text": system_prompt}]
             },
             {
@@ -450,7 +450,7 @@ class CreditReportGenerate:
                 ]
             },
         ]
-        response_4, step_outputs_4 = gpt_o1_loop_reasoning_with_tools(
+        response_4, step_outputs_4 = gemini_pro_loop_with_tools(
             model_name="o1",
             reasoning_effort="high",
             input_messages=initial_input_messages_4,
@@ -462,7 +462,7 @@ class CreditReportGenerate:
         # Step 5: write analysis
         initial_input_messages_analyse = [
             {
-                "role": "developer",
+                "role": "model",
                 "content": [{"type": "input_text", "text": system_prompt}]
             },
             {
@@ -474,7 +474,7 @@ class CreditReportGenerate:
                 ]
             },
         ]
-        response_analyse, step_outputs_analyse = gpt_o1_loop_reasoning_with_tools(
+        response_analyse, step_outputs_analyse = gemini_pro_loop_with_tools(
             model_name="o1",
             reasoning_effort="high",
             input_messages=initial_input_messages_analyse,
@@ -533,7 +533,7 @@ class CreditReportGenerate:
         print("Generating Section 5: Credit Risk... Step 1: Ratings bucket")
         initial_input_messages_1 = [
             {
-                "role": "developer",
+                "role": "model",
                 "content": [{"type": "input_text", "text": cred_system_prompt}]
             },
             {
@@ -541,7 +541,7 @@ class CreditReportGenerate:
                 "content": [{"type": "input_text", "text": cred_user_prompt_1_rtgs}]
             },
         ]
-        cred_response, cred_step_outputs_1 = gpt_o1_loop_reasoning_with_tools(
+        cred_response, cred_step_outputs_1 = gemini_pro_loop_with_tools(
             model_name="o1",
             reasoning_effort="high",
             input_messages=initial_input_messages_1,
@@ -553,7 +553,7 @@ class CreditReportGenerate:
         print("Generating Section 5: Credit Risk... Step 2: Financial bucket")
         initial_input_messages_2 = [
             {
-                "role": "developer",
+                "role": "model",
                 "content": [{"type": "input_text", "text": cred_system_prompt}]
             },
             {
@@ -564,7 +564,7 @@ class CreditReportGenerate:
                 ]
             },
         ]
-        cred_response, cred_step_outputs_2 = gpt_o1_loop_reasoning_with_tools(
+        cred_response, cred_step_outputs_2 = gemini_pro_loop_with_tools(
             model_name="o1",
             reasoning_effort="high",
             input_messages=initial_input_messages_2,
@@ -576,7 +576,7 @@ class CreditReportGenerate:
         print("Generating Section 5: Credit Risk... Step 3: Bond bucket")
         initial_input_messages_3 = [
             {
-                "role": "developer",
+                "role": "model",
                 "content": [{"type": "input_text", "text": cred_system_prompt}]
             },
             {
@@ -587,7 +587,7 @@ class CreditReportGenerate:
                 ]
             },
         ]
-        cred_response, cred_step_outputs_3 = gpt_o1_loop_reasoning_with_tools(
+        cred_response, cred_step_outputs_3 = gemini_pro_loop_with_tools(
             model_name="o1",
             reasoning_effort="high",
             input_messages=initial_input_messages_3,
@@ -599,7 +599,7 @@ class CreditReportGenerate:
         print("Generating Section 5: Credit Risk... Step 4: Additional bucket")
         initial_input_messages_4 = [
             {
-                "role": "developer",
+                "role": "model",
                 "content": [{"type": "input_text", "text": cred_system_prompt}]
             },
             {
@@ -610,7 +610,7 @@ class CreditReportGenerate:
                 ]
             },
         ]
-        cred_response, cred_step_outputs_4 = gpt_o1_loop_reasoning_with_tools(
+        cred_response, cred_step_outputs_4 = gemini_pro_loop_with_tools(
             model_name="o1",
             reasoning_effort="high",
             input_messages=initial_input_messages_4,
@@ -622,7 +622,7 @@ class CreditReportGenerate:
         print("Generating Section 5: Credit Risk... Step 5: Web search")
         initial_input_messages_5 = [
             {
-                "role": "developer",
+                "role": "model",
                 "content": [{"type": "input_text", "text": cred_system_prompt}]
             },
             {
@@ -633,11 +633,11 @@ class CreditReportGenerate:
                 ]
             },
         ]
-        cred_response, cred_step_outputs_5 = gpt_o1_loop_reasoning_with_tools(
+        cred_response, cred_step_outputs_5 = gemini_pro_loop_with_tools(
             model_name="o1",
             reasoning_effort="high",
             input_messages=initial_input_messages_5,
-            tools=[tl.gpt_4o_web_search_tool, tl.get_financial_metrics_yf_api_tool],
+            tools=[tl.gemini_web_search_tool, tl.get_financial_metrics_yf_api_tool],
             file_category=None
         )
         cred_step_outputs.extend(cred_step_outputs_4)
@@ -712,9 +712,9 @@ def find_date_today_and_latest_fin_period(company_name):
             "content": [{"type": "input_text", "text": user_prompt}]
         }
     ]
-    response, step_outputs = gpt_o1_loop_reasoning_with_tools(
+    response, step_outputs = gemini_pro_loop_with_tools(
         model_name="o1", reasoning_effort="high", input_messages=initial_input_messages,
-        tools=[tl.gpt_4o_web_search_tool, tl.rag_retrieval_tool],
+        tools=[tl.gemini_web_search_tool, tl.rag_retrieval_tool],
         file_category=["ratings", "financial", "bond", "additional"],
         company_name=company_name
     )
@@ -735,15 +735,15 @@ def generate_business_overview(company_name, date_and_latest_fin):
                                 .replace("_DATE_TODAY_AND_LATEST_REPORTING_PERIOD_", date_and_latest_fin))
     initial_input_messages = [
         {
-            "role": "developer",
+            "role": "model",
             "content": [{"type": "input_text", "text": business_overview_prompt}]
         }
     ]
     tools = [
-        tl.rag_retrieval_tool, tl.gpt_4o_web_search_tool, tl.get_financial_metrics_yf_api_tool,
+        tl.rag_retrieval_tool, tl.gemini_web_search_tool, tl.get_financial_metrics_yf_api_tool,
         tl.get_financial_metrics_api_for_chatbot_tool
     ]
-    response, step_outputs = gpt_o1_loop_reasoning_with_tools(
+    response, step_outputs = gemini_pro_loop_with_tools(
         model_name="o1", reasoning_effort="high", input_messages=initial_input_messages, tools=tools,
         file_category=["ratings", "financial"],
         company_name=company_name
@@ -776,7 +776,7 @@ def generate_financial_health(company_name, date_and_latest_fin):
 
     initial_input_messages_1 = [
         {
-            "role": "developer",
+            "role": "model",
             "content": [{"type": "input_text", "text": fin_system_prompt}]
         },
         {
@@ -785,18 +785,18 @@ def generate_financial_health(company_name, date_and_latest_fin):
         },
     ]
     tools = [
-        tl.rag_retrieval_tool, tl.gpt_4o_web_search_tool, tl.get_financial_metrics_yf_api_for_table_tool,
+        tl.rag_retrieval_tool, tl.gemini_web_search_tool, tl.get_financial_metrics_yf_api_for_table_tool,
         # tl.get_financial_metrics_api_for_chatbot_tool
     ]
     # Step 1: create metric tables
-    fin_health_response_1, fin_health_step_outputs_1 = gpt_o1_loop_reasoning_with_tools(
+    fin_health_response_1, fin_health_step_outputs_1 = gemini_pro_loop_with_tools(
         model_name="o1", reasoning_effort="high", input_messages=initial_input_messages_1, tools=tools,
         file_category=["financial", "ratings"], company_name=company_name
     )
     # Step 2: write analysis
     initial_input_messages_2 = [
         {
-            "role": "developer",
+            "role": "model",
             "content": [{"type": "input_text", "text": fin_system_prompt}]
         },
         {
@@ -807,7 +807,7 @@ def generate_financial_health(company_name, date_and_latest_fin):
             ]
         },
     ]
-    fin_health_response_2, fin_health_step_outputs_2 = gpt_o1_loop_reasoning_with_tools(
+    fin_health_response_2, fin_health_step_outputs_2 = gemini_pro_loop_with_tools(
         model_name="o1", reasoning_effort="high", input_messages=initial_input_messages_2, tools=tools,
         file_category=["financial", "ratings"], company_name=company_name
     )
@@ -849,11 +849,11 @@ def generate_debt_structure(company_name, date_and_latest_fin):
 
     debt_tables_str = ""
     debt_step_outputs = []
-    tools = [tl.rag_retrieval_tool, tl.gpt_4o_web_search_tool, tl.get_bonds_api_for_chatbot_tool]
+    tools = [tl.rag_retrieval_tool, tl.gemini_web_search_tool, tl.get_bonds_api_for_chatbot_tool]
     # Step 1: create table for bond series
     initial_input_messages_1 = [
         {
-            "role": "developer",
+            "role": "model",
             "content": [{"type": "input_text", "text": system_prompt}]
         },
         {
@@ -861,7 +861,7 @@ def generate_debt_structure(company_name, date_and_latest_fin):
             "content": [{"type": "input_text", "text": user_prompt_1_table1_bond}]
         },
     ]
-    response_1, step_outputs_1 = gpt_o1_loop_reasoning_with_tools(
+    response_1, step_outputs_1 = gemini_pro_loop_with_tools(
         model_name="o1",
         reasoning_effort="high",
         input_messages=initial_input_messages_1,
@@ -873,7 +873,7 @@ def generate_debt_structure(company_name, date_and_latest_fin):
     # Step 2: create table for g3 debt
     initial_input_messages_2 = [
         {
-            "role": "developer",
+            "role": "model",
             "content": [{"type": "input_text", "text": system_prompt}]
         },
         {
@@ -884,7 +884,7 @@ def generate_debt_structure(company_name, date_and_latest_fin):
             ]
         },
     ]
-    response_2, step_outputs_2 = gpt_o1_loop_reasoning_with_tools(
+    response_2, step_outputs_2 = gemini_pro_loop_with_tools(
         model_name="o1",
         reasoning_effort="high",
         input_messages=initial_input_messages_2,
@@ -896,7 +896,7 @@ def generate_debt_structure(company_name, date_and_latest_fin):
     # Step 3: create table for local debt
     initial_input_messages_3 = [
         {
-            "role": "developer",
+            "role": "model",
             "content": [{"type": "input_text", "text": system_prompt}]
         },
         {
@@ -907,11 +907,11 @@ def generate_debt_structure(company_name, date_and_latest_fin):
             ]
         },
     ]
-    response_3, step_outputs_3 = gpt_o1_loop_reasoning_with_tools(
+    response_3, step_outputs_3 = gemini_pro_loop_with_tools(
         model_name="o1",
         reasoning_effort="high",
         input_messages=initial_input_messages_3,
-        tools=[tl.rag_retrieval_tool, tl.gpt_4o_web_search_tool],
+        tools=[tl.rag_retrieval_tool, tl.gemini_web_search_tool],
         file_category=["ratings", "bond"]
     )
     debt_tables_str += "\n\n" + re.sub("```.+\n|```\n|```", "", response_3)
@@ -919,7 +919,7 @@ def generate_debt_structure(company_name, date_and_latest_fin):
     # Step 4: create table for debt maturity wall
     initial_input_messages_4 = [
         {
-            "role": "developer",
+            "role": "model",
             "content": [{"type": "input_text", "text": system_prompt}]
         },
         {
@@ -931,7 +931,7 @@ def generate_debt_structure(company_name, date_and_latest_fin):
             ]
         },
     ]
-    response_4, step_outputs_4 = gpt_o1_loop_reasoning_with_tools(
+    response_4, step_outputs_4 = gemini_pro_loop_with_tools(
         model_name="o1",
         reasoning_effort="high",
         input_messages=initial_input_messages_4,
@@ -943,7 +943,7 @@ def generate_debt_structure(company_name, date_and_latest_fin):
     # Step 5: write analysis
     initial_input_messages_analyse = [
         {
-            "role": "developer",
+            "role": "model",
             "content": [{"type": "input_text", "text": system_prompt}]
         },
         {
@@ -954,7 +954,7 @@ def generate_debt_structure(company_name, date_and_latest_fin):
             ]
         },
     ]
-    response_analyse, step_outputs_analyse = gpt_o1_loop_reasoning_with_tools(
+    response_analyse, step_outputs_analyse = gemini_pro_loop_with_tools(
         model_name="o1",
         reasoning_effort="high",
         input_messages=initial_input_messages_analyse,
@@ -1008,7 +1008,7 @@ def generate_credit_risk(company_name, date_and_latest_fin):
     print("Generating Section 5: Credit Risk... Step 1: Ratings bucket")
     initial_input_messages_1 = [
         {
-            "role": "developer",
+            "role": "model",
             "content": [{"type": "input_text", "text": cred_system_prompt}]
         },
         {
@@ -1016,7 +1016,7 @@ def generate_credit_risk(company_name, date_and_latest_fin):
             "content": [{"type": "input_text", "text": cred_user_prompt_1_ratings}]
         },
     ]
-    cred_response, cred_step_outputs_1 = gpt_o1_loop_reasoning_with_tools(
+    cred_response, cred_step_outputs_1 = gemini_pro_loop_with_tools(
         model_name="o1",
         reasoning_effort="high",
         input_messages=initial_input_messages_1,
@@ -1028,7 +1028,7 @@ def generate_credit_risk(company_name, date_and_latest_fin):
     print("Generating Section 5: Credit Risk... Step 2: Financial bucket")
     initial_input_messages_2 = [
         {
-            "role": "developer",
+            "role": "model",
             "content": [{"type": "input_text", "text": cred_system_prompt}]
         },
         {
@@ -1039,11 +1039,11 @@ def generate_credit_risk(company_name, date_and_latest_fin):
             ]
         },
     ]
-    cred_response, cred_step_outputs_2 = gpt_o1_loop_reasoning_with_tools(
+    cred_response, cred_step_outputs_2 = gemini_pro_loop_with_tools(
         model_name="o1",
         reasoning_effort="high",
         input_messages=initial_input_messages_2,
-        tools=tools,  #, tl.gpt_4o_web_search_tool
+        tools=tools,  #, tl.gemini_web_search_tool
         file_category=["financial"]
     )
     cred_step_outputs.extend(cred_step_outputs_2)
@@ -1051,7 +1051,7 @@ def generate_credit_risk(company_name, date_and_latest_fin):
     print("Generating Section 5: Credit Risk... Step 3: Additional bucket")
     initial_input_messages_3 = [
         {
-            "role": "developer",
+            "role": "model",
             "content": [{"type": "input_text", "text": cred_system_prompt}]
         },
         {
@@ -1062,7 +1062,7 @@ def generate_credit_risk(company_name, date_and_latest_fin):
             ]
         },
     ]
-    cred_response, cred_step_outputs_3 = gpt_o1_loop_reasoning_with_tools(
+    cred_response, cred_step_outputs_3 = gemini_pro_loop_with_tools(
         model_name="o1",
         reasoning_effort="high",
         input_messages=initial_input_messages_3,
@@ -1074,7 +1074,7 @@ def generate_credit_risk(company_name, date_and_latest_fin):
     print("Generating Section 5: Credit Risk... Step 4: Web search")
     initial_input_messages_4 = [
         {
-            "role": "developer",
+            "role": "model",
             "content": [{"type": "input_text", "text": cred_system_prompt}]
         },
         {
@@ -1085,12 +1085,12 @@ def generate_credit_risk(company_name, date_and_latest_fin):
             ]
         },
     ]
-    cred_response, cred_step_outputs_4 = gpt_o1_loop_reasoning_with_tools(
+    cred_response, cred_step_outputs_4 = gemini_pro_loop_with_tools(
         model_name="o1",
         reasoning_effort="high",
         input_messages=initial_input_messages_4,
         tools=[
-            tl.gpt_4o_web_search_tool, tl.get_financial_metrics_yf_api_tool,
+            tl.gemini_web_search_tool, tl.get_financial_metrics_yf_api_tool,
             # tl.get_financial_metrics_api_for_chatbot_tool  # tl.get_bonds_api_for_chatbot_tool,
         ],
         file_category=None
@@ -1119,7 +1119,7 @@ def generate_executive_summary(company_name, date_and_latest_fin, credit_report_
     )
     initial_input_messages = [
         {
-            "role": "developer",
+            "role": "model",
             "content": [{"type": "input_text", "text": exec_summary_prompt}]
         },
         {
@@ -1133,11 +1133,11 @@ def generate_executive_summary(company_name, date_and_latest_fin, credit_report_
             ]
         },
     ]
-    summary_response, summary_step_outputs = gpt_o1_loop_reasoning_with_tools(
+    summary_response, summary_step_outputs = gemini_pro_loop_with_tools(
         model_name="o1",
         reasoning_effort="high",
         input_messages=initial_input_messages,
-        tools=[tl.rag_retrieval_tool, tl.gpt_4o_web_search_tool],  #, gpt_4o_web_search_tool
+        tools=[tl.rag_retrieval_tool, tl.gemini_web_search_tool],  #, gemini_web_search_tool
         file_category=["financial", "ratings"]
     )
     # credit_report_dict.update({"exec_summary": summary_response})

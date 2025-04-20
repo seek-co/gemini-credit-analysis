@@ -22,6 +22,94 @@ if not bool(os.getenv("PRODUCTION_MODE")):
     load_dotenv()
 
 
+def detect_news_company(news_title, news_body):
+    """
+    Detect which company the news is related to based on the content.
+    Returns the company name and a confidence score.
+    """
+    # Companies we're monitoring
+    companies = {
+        "Sasol Limited": ["sasol", "sasol limited", "south africa", "south african energy", "south african chemicals"],
+        "Arabian Centres": ["arabian centres", "cenomi", "saudi arabia", "saudi retail", "saudi mall"],
+        "Tullow Oil": ["tullow", "tullow oil", "ghana", "kenya", "oil exploration", "african oil"]
+    }
+    
+    # Combine title and body for analysis
+    combined_text = (news_title + " " + news_body).lower()
+    
+    # Check for company mentions and calculate a simple score
+    results = {}
+    for company, keywords in companies.items():
+        score = 0
+        for keyword in keywords:
+            if keyword.lower() in combined_text:
+                # Add more weight if found in the title
+                if keyword.lower() in news_title.lower():
+                    score += 3
+                else:
+                    score += 1
+        results[company] = score
+    
+    # Get the company with highest score
+    detected_company = max(results.items(), key=lambda x: x[1])
+    
+    # If no clear match (score 0), try advanced detection using Gemini
+    if detected_company[1] == 0:
+        try:
+            return detect_company_with_gemini(news_title, news_body)
+        except Exception as e:
+            # Fall back to best guess if Gemini fails
+            return max(results.items(), key=lambda x: x[1])[0], 0
+    
+    return detected_company[0], detected_company[1]
+
+
+def detect_company_with_gemini(news_title, news_body):
+    """Use Gemini to detect which company the news is related to"""
+    client_gem = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    model = "gemini-2.5-flash-preview-04-17"
+    
+    prompt = f"""
+    Determine which company the following news is most related to. The options are:
+    - Sasol Limited (South African energy and chemicals company)
+    - Arabian Centres/Cenomi (Saudi Arabian retail and mall company)
+    - Tullow Oil (Oil exploration company focused on Africa)
+    
+    News title: {news_title}
+    News body: {news_body}
+    
+    Respond with just the company name exactly as one of the three options above.
+    """
+    
+    response = client_gem.models.generate_text(
+        model=model,
+        prompt=prompt,
+        config=types.GenerateTextConfig(temperature=0)
+    )
+    
+    result = response.text.strip()
+    
+    # Map partial matches to full company names
+    company_mapping = {
+        "sasol": "Sasol Limited",
+        "arabian": "Arabian Centres",
+        "cenomi": "Arabian Centres",
+        "tullow": "Tullow Oil"
+    }
+    
+    detected_company = None
+    for key, value in company_mapping.items():
+        if key.lower() in result.lower():
+            detected_company = value
+            break
+    
+    # If still no match, use the first company as default
+    if not detected_company:
+        detected_company = "Sasol Limited"
+    
+    return detected_company, 5  # High confidence score for AI detection
+
+
 def evaluate_credit_impact_dummy():
     with open('./data/news_alert_sample.json', "r") as f:
         file_ctn = f.read()
@@ -41,7 +129,7 @@ def evaluate_credit_impact(company_name, news_title, news_body, sasol_true_rpt=F
 
     client_gem = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     # model name
-    model = "gemini-2.5-pro-preview-03-25"  # "gemini-2.5-pro-preview-03-25"  gemini-2.0-flash
+    model = "gemini-2.5-flash-preview-04-17"
     # system prompt
     prompts_path = pathlib.Path().parent.joinpath("./prompts").resolve()
     system_prompt_file_name = "alert_system_prompt.txt"
@@ -148,3 +236,82 @@ def build_message(from_email, destination, subject, body):
     message['from'] = from_email
     message['subject'] = subject
     return {'raw': urlsafe_b64encode(message.as_bytes()).decode()}
+
+
+def analyze_raw_news(raw_text):
+    """
+    Uses Gemini to analyze raw news text and extract the title, body, and company.
+    
+    Args:
+        raw_text (str): The raw news text
+        
+    Returns:
+        dict: A dictionary containing the news title, body, company, and confidence
+    """
+    client_gem = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    model = "gemini-2.5-flash-preview-04-17"
+    
+    prompt = f"""
+    Analyze the following news text and extract:
+    1. A concise news title (if not clear, create one that captures the main point)
+    2. The news body (main content) 
+    3. Which company this news is most related to from these options:
+       - Sasol Limited (South African energy and chemicals company)
+       - Arabian Centres/Cenomi (Saudi Arabian retail and mall company)
+       - Tullow Oil (Oil exploration company focused on Africa)
+    
+    Raw news text:
+    {raw_text}
+    
+    Respond with a JSON object with the following structure:
+    {{
+      "title": "The extracted or created news title",
+      "body": "The extracted news body",
+      "company": "The company name (exactly as one of the three options)",
+      "confidence": 1-10 (how confident you are in the company identification)
+    }}
+    """
+    response = client_gem.models.generate_content(
+        model=model,
+        contents=prompt,
+        config=types.GenerateContentConfig(temperature=0)
+    )
+    
+    # Extract JSON from the response
+    try:
+        # Extract JSON from potential markdown codeblock
+        match = re.search(r'```json\s*(.*?)\s*```', response.text, re.DOTALL)
+        if match:
+            json_str = match.group(1)
+        else:
+            # Try to find JSON without markdown
+            match = re.search(r'\{.*\}', response.text, re.DOTALL)
+            if match:
+                json_str = match.group(0)
+            else:
+                json_str = response.text
+        
+        result = json.loads(json_str)
+        
+        # Normalize company name if needed
+        company_mapping = {
+            "sasol": "Sasol Limited",
+            "arabian": "Arabian Centres",
+            "cenomi": "Arabian Centres",
+            "tullow": "Tullow Oil"
+        }
+        
+        for key, value in company_mapping.items():
+            if key.lower() in result["company"].lower():
+                result["company"] = value
+                break
+                
+        return result
+    except Exception as e:
+        # Fallback to manual extraction if JSON parsing fails
+        return {
+            "title": raw_text.split("\n")[0][:100],  # First line as title, max 100 chars
+            "body": raw_text,
+            "company": "Sasol Limited",  # Default company
+            "confidence": 1
+        }
