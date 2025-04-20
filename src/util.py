@@ -38,7 +38,7 @@ from unstructured.documents.elements import Image, Table
 # )
 
 from google import genai
-from google.genai import types
+from google.genai import types, client
 from google.oauth2 import service_account
 from google.cloud import storage
 from google.cloud import storage_control_v2
@@ -736,13 +736,10 @@ def gemini_web_search(search_input: str):
             )
         )
 
-        print(f"search_input: {search_input}")
-    
         # Extract the main response text
         response_text = response.text if hasattr(response, 'text') else "No response text found."
         
         # Build citation string from grounding metadata
-        print(f"response: {response}")
         # Format the final output
         result = f"Web Search Result:\n{response_text}\n\n"
             
@@ -1284,48 +1281,38 @@ def gemini_pro_loop_with_tools(
     step_responses = []
     function_declarations = []
     for tool in tools:
-        if isinstance(tool, types.FunctionDeclaration):
-            function_declarations.append(tool)
-        else:
-            # Handle dictionary format tools
-            func = tool['function']
-            function_declarations.append(
-                types.FunctionDeclaration(
-                    name=func['name'],
-                    description=func.get('description', ''),
-                    parameters=func.get('parameters', {})
-                )
-            )
-    
+        function_declarations.append(tool)
+
     # Create Tool list for Gemini (only one Tool with all function declarations)
     gemini_tools = [types.Tool(function_declarations=function_declarations)] if function_declarations else []
-    
+
     while continue_function_call:
         # Convert messages to Gemini format
         gemini_messages = []
         for msg in input_messages:
             if msg.get('type') == 'function_call':
-                gemini_messages.append({
-                    'role': 'model',
-                    'parts': [{'function_call': {
-                        'name': msg['name'],
-                        'args': json.loads(msg['arguments'])
-                    }}]
-                })
+                gemini_messages.append(types.Content(
+                    role='model',
+                    parts=[types.Part(function_call=types.FunctionCall(
+                        name=msg['name'],
+                        args=json.loads(msg['arguments'])
+                    ))]
+                ))
             elif msg.get('type') == 'function_call_output':
-                gemini_messages.append({
-                    'role': 'user',
-                    'parts': [{'function_response': {
-                        'response': {'content': msg['output']}
-                    }}]
-                })
+                gemini_messages.append(types.Content(
+                    role='user',
+                    parts=[types.Part.from_function_response(
+                        name=msg.get('name', ''),  # Use empty string as fallback if name not provided
+                        response={"result": msg['output']}
+                    )]
+                ))
             else:
                 role = 'user' if msg['role'] in ['user', 'system'] else 'model'
                 content = str(msg['content']) if isinstance(msg['content'], (list, dict)) else msg['content']
-                gemini_messages.append({
-                    'role': role,
-                    'parts': [{'text': content}]
-                })
+                gemini_messages.append(types.Content(
+                    role=role,
+                    parts=[types.Part.from_text(text=content)]
+                ))
 
         # Configure tool usage
         tool_config_mode = 'ANY' if step_number < len(tools) else 'AUTO'
@@ -1336,92 +1323,81 @@ def gemini_pro_loop_with_tools(
             tools=gemini_tools,
             tool_config=tool_config
         )
-        
+
+        print("----------gemini_messages", gemini_messages)
         response = client_gemini.models.generate_content(
             model=model_name,
             contents=gemini_messages,
             config=config
         )
+        step_number += 1
 
-        # Process response
-        func_call_output = []
-        if response.candidates:
-            first_candidate = response.candidates[0]
-            if hasattr(first_candidate.content, 'parts'):
-                for part in first_candidate.content.parts:
-                    if hasattr(part, 'function_call'):
-                        fc = part.function_call
-                        func_call = {
-                            'type': 'function_call',
-                            'name': fc.name,
-                            'arguments': json.dumps(fc.args)
-                        }
-                        func_call_output.append(func_call)
-                        input_messages.append(func_call)
-
-        print("func_call_output:", func_call_output)
-        if func_call_output:
+        if response.candidates[0].content.parts[0].function_call:
+            function_call = response.candidates[0].content.parts[0].function_call
+            print(f"Function to call: {function_call}")
             func_step_resp_ls = []
-            for tool_call in func_call_output:
-                tool_name = tool_call['name']
-                tool_args = json.loads(tool_call['arguments'])
-                
-                # Modify arguments based on tool
-                if tool_name == "rag_search_and_retrieval":
-                    if company_name: tool_args['company_name'] = company_name
-                    if file_category: tool_args['file_category'] = file_category
-                elif tool_name in ["get_financial_metrics_yf_api", "get_bond_data_api_for_chatbot", "get_financial_metrics_yf_api_for_table", "get_financial_metrics_api", "get_bond_data_api", "get_financial_metrics_api_for_chatbot"]:
-                    if company_name: tool_args['company_name'] = company_name
-                    tool_args['from_api'] = False
+        
+            tool_name = function_call.name
+            tool_args = function_call.args
+            if tool_name == "rag_search_and_retrieval":
+                if company_name is not None:
+                    tool_args.update({"company_name": company_name})
+                if file_category is not None:
+                    tool_args.update({"file_category": file_category})
+            elif (tool_name == "get_financial_metrics_yf_api_for_table" or
+                    tool_name == "get_financial_metrics_yf_api" or
+                    tool_name == "get_financial_metrics_api" or
+                    tool_name == "get_financial_metrics_api_for_chatbot"):
+                if company_name is not None:
+                    tool_args.update({"company_name": company_name})
+                tool_args.update({"from_api": False})
+            elif tool_name == "get_bond_data_api" or tool_name == "get_bond_data_api_for_chatbot":
+                if company_name is not None:
+                    tool_args.update({"company_name": company_name})
+                tool_args.update({"from_api": False})
 
-                # Execute tool
-                function_result = process_tool_call(tool_name, tool_args)
-                
-                # Store results
-                input_messages.append({
-                    'type': 'function_call_output',
-                    'name': tool_name,  # Add the function name here
-                    'output': str(function_result)
-                })
-
-                # Handle RAG file attachments
-                if tool_name == "rag_search_and_retrieval":
-                    input_file_data_ls = []
-                    for obj in function_result[1]:
-                        if obj.get('content_type') in ['image', 'table']:
-                            input_file_data_ls.append({
-                                'type': 'input_file',
-                                'filename': os.path.basename(obj['source_document']),
-                                'file_data': f"data:{obj['mime_type']};base64,{obj['base64_encoding']}"
-                            })
-                    if input_file_data_ls:
-                        input_messages.append({'role': 'user', 'content': input_file_data_ls})
-
-                # Record step
-                func_step_resp_ls.append({
-                    'step_number': step_number,
-                    'calling': f"{tool_name}(**{json.dumps(tool_args)})",
-                    'output': str(function_result)
-                })
+            function_result = process_tool_call(tool_name=tool_name, tool_input=tool_args)
             
+            print("Function calling result", function_result)
+            input_messages.append({
+                "type": "function_call",
+                "name": tool_name,
+                "arguments": json.dumps(tool_args)
+            })
+            input_messages.append({
+                "type": "function_call_output",
+                "output": str(function_result[0] if tool_name == "rag_search_and_retrieval" else function_result)
+            })
+            if tool_name == "rag_search_and_retrieval":
+                input_file_data_ls = []
+                for obj in function_result[1]:
+                    if ((obj['content_type'] == "image" or obj['content_type'] == 'table')
+                            and 'mime_type' in obj.keys() and 'base64_encoding' in obj.keys()):
+                        if obj['mime_type'] is not None and obj['base64_encoding'] is not None:
+                            input_file_data_ls.append({
+                                "type": "input_file",
+                                "filename": os.path.basename(os.path.normpath(obj['source_document'])),
+                                "file_data": f"data:{obj['mime_type']};base64,{obj['base64_encoding']}",
+                            })
+                input_messages.append({"role": "user", "content": input_file_data_ls})
+            # append intermediate func calling steps
+            func_step_resp_ls.append({
+                "step_number": str(step_number),
+                "calling": str(f"{tool_name}(**{json.dumps(tool_args)})"),
+                "output": str(function_result)
+            })
             step_responses.extend(func_step_resp_ls)
-            step_number += 1
         else:
-            # Final response
-            response_str = ""
-            if response.candidates:
-                first_candidate = response.candidates[0]
-                if hasattr(first_candidate.content, 'parts'):
-                    for part in first_candidate.content.parts:
-                        if hasattr(part, 'text'):
-                            response_str += part.text
-
+            print("No function call found in the response.")
+            print(response.text)
+            response_str = response.text
             step_responses.append({
-                'step_number': step_number,
-                'calling': 'final',
-                'output': response_str
+                "step_number": str(step_number),
+                "calling": "final",
+                "output": response_str
             })
             continue_function_call = False
+            break
 
     return response_str, step_responses
 

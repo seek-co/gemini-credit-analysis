@@ -2,16 +2,41 @@ import os
 import json
 import dash
 import dash_bootstrap_components as dbc
+import smtplib
+from email.message import EmailMessage
 
 from dash import html, dcc, callback, Input, Output, State
 
-from src.news_alert import evaluate_credit_impact, gmail_authenticate, build_message
+from src.news_alert import evaluate_credit_impact, analyze_raw_news
 
 
 # load .env if not in production
 if not bool(os.getenv("PRODUCTION_MODE")):
     from dotenv import load_dotenv
     load_dotenv()
+
+
+# Email configuration
+EMAIL_ADDRESS = os.getenv("GMAIL_SENDER_EMAIL", "biggriffin640@gmail.com")
+EMAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "pbet zpha icaq qfdi")
+
+# Function to send email using smtplib
+def send_email(subject, body, to_email):
+    msg = EmailMessage()
+    msg['Subject'] = subject
+    msg['From'] = EMAIL_ADDRESS
+    msg['To'] = to_email
+    msg.set_content(body)
+    
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+            print("Sending email...", "EMAIL_ADDRESS", EMAIL_ADDRESS, "EMAIL_PASSWORD", EMAIL_PASSWORD, "body", body)
+            smtp.send_message(msg)
+        return True
+    except Exception as e:
+        print(f"Error sending email: {str(e)}")
+        return False
 
 
 dash.register_page(__name__, path="/projects/alert", name="Opportunity Alert", order=1)
@@ -234,8 +259,6 @@ for i, news in enumerate(news_sasol_ls):
                 )
                 print(response_json)
                 if isinstance(response_json, dict):
-                    service = gmail_authenticate()
-                    # construct email
                     if response_json['credit_impact'] != "neutral":
                         email_subject = f"Possible {response_json['credit_impact']} opportunity for {company_name}"
                         email_body = (
@@ -245,14 +268,8 @@ for i, news in enumerate(news_sasol_ls):
                             f"Basis: {response_json['basis']} \n\n"
                             f"Reason: {response_json['reason']}"
                         )
-                        # send email
-                        service.users().messages().send(
-                              userId="me",
-                              body=build_message(
-                                  from_email=os.getenv("GMAIL_SENDER_EMAIL"), destination=recipient_email_add,
-                                  subject=email_subject, body=email_body
-                              )
-                            ).execute()
+                        # send email using smtplib
+                        send_email(email_subject, email_body, recipient_email_add)
                     return 0, None, [html.Div(f"{key}: {value}") for key, value in response_json.items()]
                 else:
                     return 0, None, f"{response_json}"
@@ -281,8 +298,6 @@ for i, news in enumerate(news_cenomi_ls):
                     company_name=company_name, news_title=news_title, news_body=news_body, sasol_true_rpt=False
                 )
                 if isinstance(response_json, dict):
-                    service = gmail_authenticate()
-                    # construct email
                     if response_json['credit_impact'] != "neutral":
                         email_subject = f"Possible {response_json['credit_impact']} opportunity for {company_name}"
                         email_body = (
@@ -292,14 +307,8 @@ for i, news in enumerate(news_cenomi_ls):
                             f"Basis: {response_json['basis']} \n\n"
                             f"Reason: {response_json['reason']}"
                         )
-                        # send email
-                        service.users().messages().send(
-                              userId="me",
-                              body=build_message(
-                                  from_email=os.getenv("GMAIL_SENDER_EMAIL"), destination=recipient_email_add,
-                                  subject=email_subject, body=email_body
-                              )
-                            ).execute()
+                        # send email using smtplib
+                        send_email(email_subject, email_body, recipient_email_add)
                     return 0, None, [html.Div(f"{key}: {value}") for key, value in response_json.items()]
                 else:
                     return 0, None, f"{response_json}"
@@ -328,8 +337,6 @@ for i, news in enumerate(news_tullow_ls):
                     company_name=company_name, news_title=news_title, news_body=news_body, sasol_true_rpt=False
                 )
                 if isinstance(response_json, dict):
-                    service = gmail_authenticate()
-                    # construct email if bearish or bullish
                     if response_json['credit_impact'] != "neutral":
                         email_subject = f"Possible {response_json['credit_impact']} opportunity for {company_name}"
                         email_body = (
@@ -339,14 +346,8 @@ for i, news in enumerate(news_tullow_ls):
                             f"Basis: {response_json['basis']} \n\n"
                             f"Reason: {response_json['reason']}"
                         )
-                        # send email
-                        service.users().messages().send(
-                              userId="me",
-                              body=build_message(
-                                  from_email=os.getenv("GMAIL_SENDER_EMAIL"), destination=recipient_email_add,
-                                  subject=email_subject, body=email_body
-                              )
-                            ).execute()
+                        # send email using smtplib
+                        send_email(email_subject, email_body, recipient_email_add)
                     return 0, None, [html.Div(f"{key}: {value}") for key, value in response_json.items()]
                 else:
                     return 0, None, f"{response_json}"
@@ -438,8 +439,6 @@ def process_manual_news(num_click, recipient_email_add, news_text, selected_comp
         news_title = analysis_result["title"]
         news_body = analysis_result["body"]
 
-        print(analysis_result)
-        
         # Use selected company if provided, otherwise use detected company
         if selected_company:
             company = selected_company
@@ -459,8 +458,6 @@ def process_manual_news(num_click, recipient_email_add, news_text, selected_comp
         print("result atfter evaluation: ", response_json)
         
         if isinstance(response_json, dict):
-            service = gmail_authenticate()
-            # Send email if credit impact is not neutral
             if response_json['credit_impact'] != "neutral":
                 email_subject = f"Possible {response_json['credit_impact']} opportunity for {company}"
                 email_body = (
@@ -470,16 +467,8 @@ def process_manual_news(num_click, recipient_email_add, news_text, selected_comp
                     f"Basis: {response_json['basis']} \n\n"
                     f"Reason: {response_json['reason']}"
                 )
-                # send email
-                service.users().messages().send(
-                    userId="me",
-                    body=build_message(
-                        from_email=os.getenv("GMAIL_SENDER_EMAIL"), 
-                        destination=recipient_email_add,
-                        subject=email_subject, 
-                        body=email_body
-                    )
-                ).execute()
+                # send email using smtplib
+                send_email(email_subject, email_body, recipient_email_add)
             
             # Display analysis info followed by evaluation results
             result_display = [
@@ -531,8 +520,6 @@ def process_uploaded_file(num_click, recipient_email_add, news_text, sasol_true_
         )
         
         if isinstance(response_json, dict):
-            service = gmail_authenticate()
-            # Send email if credit impact is not neutral
             if response_json['credit_impact'] != "neutral":
                 email_subject = f"Possible {response_json['credit_impact']} opportunity for {company}"
                 email_body = (
@@ -542,16 +529,8 @@ def process_uploaded_file(num_click, recipient_email_add, news_text, sasol_true_
                     f"Basis: {response_json['basis']} \n\n"
                     f"Reason: {response_json['reason']}"
                 )
-                # send email
-                service.users().messages().send(
-                    userId="me",
-                    body=build_message(
-                        from_email=os.getenv("GMAIL_SENDER_EMAIL"), 
-                        destination=recipient_email_add,
-                        subject=email_subject, 
-                        body=email_body
-                    )
-                ).execute()
+                # send email using smtplib
+                send_email(email_subject, email_body, recipient_email_add)
             
             # Display analysis info followed by evaluation results
             result_display = [

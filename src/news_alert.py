@@ -197,39 +197,6 @@ def evaluate_credit_impact(company_name, news_title, news_body, sasol_true_rpt=F
     response_json = json.loads(re.sub(".+\n```.+\n|.+\n```\n|```", "", response.text))
     return response_json
 
-
-def gmail_authenticate():
-    creds = None
-    # the file token.pickle stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first time
-    if os.path.exists("token.pickle"):
-        with open("token.pickle", "rb") as token:
-            creds = pickle.load(token)
-    # if there are no (valid) credentials available, let the user log in.
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_config(
-                client_config={
-                    "installed":{
-                        "client_id":os.getenv("GMAIL_CLIENT_ID"),
-                        "project_id":os.getenv("GCLOUD_PROJECT_ID"),
-                        "auth_uri":"https://accounts.google.com/o/oauth2/auth",
-                        "token_uri":"https://oauth2.googleapis.com/token",
-                        "auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs",
-                        "client_secret":os.getenv("GMAIL_CLIENT_SECRET"),
-                        "redirect_uris":["http://localhost"]
-                    }},
-                scopes=['https://mail.google.com/']
-            )
-            creds = flow.run_local_server(port=0)
-        # save the credentials for the next run
-        with open("token.pickle", "wb") as token:
-            pickle.dump(creds, token)
-    return build('gmail', 'v1', credentials=creds)
-
-
 def build_message(from_email, destination, subject, body):
     message = MIMEText(body)
     message['to'] = destination
@@ -251,47 +218,69 @@ def analyze_raw_news(raw_text):
     client_gem = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     model = "gemini-2.5-flash-preview-04-17"
     
-    prompt = f"""
-    Analyze the following news text and extract:
-    1. A concise news title (if not clear, create one that captures the main point)
-    2. The news body (main content) 
-    3. Which company this news is most related to from these options:
-       - Sasol Limited (South African energy and chemicals company)
-       - Arabian Centres/Cenomi (Saudi Arabian retail and mall company)
-       - Tullow Oil (Oil exploration company focused on Africa)
+    # Create schema for structured response
+    response_schema = genai.types.Schema(
+        type=genai.types.Type.OBJECT,
+        required=["title", "body", "company", "confidence"],
+        properties={
+            "title": genai.types.Schema(
+                type=genai.types.Type.STRING,
+                description="A concise news title that captures the main point"
+            ),
+            "body": genai.types.Schema(
+                type=genai.types.Type.STRING,
+                description="The extracted news body (main content)"
+            ),
+            "company": genai.types.Schema(
+                type=genai.types.Type.STRING,
+                description="The company name this news is most related to",
+                enum=["Sasol Limited", "Arabian Centres", "Tullow Oil"]
+            ),
+            "confidence": genai.types.Schema(
+                type=genai.types.Type.INTEGER,
+                description="Confidence score for company identification (1-10)",
+                minimum=1,
+                maximum=10
+            )
+        }
+    )
     
+    # System instruction
+    system_instruction = """
+    Analyze the provided news text and extract key information including title, body content, 
+    and which company it relates to from the given options. Respond with structured data only.
+    """
+    
+    # User prompt
+    user_prompt = f"""
     Raw news text:
     {raw_text}
     
-    Respond with a JSON object with the following structure:
-    {{
-      "title": "The extracted or created news title",
-      "body": "The extracted news body",
-      "company": "The company name (exactly as one of the three options)",
-      "confidence": 1-10 (how confident you are in the company identification)
-    }}
+    Extract the title, body, related company, and your confidence level in the company identification.
+    Company options:
+    - Sasol Limited (South African energy and chemicals company)
+    - Arabian Centres/Cenomi (Saudi Arabian retail and mall company)
+    - Tullow Oil (Oil exploration company focused on Africa)
     """
-    response = client_gem.models.generate_content(
-        model=model,
-        contents=prompt,
-        config=types.GenerateContentConfig(temperature=0)
+    
+    # Configure the request
+    generate_content_config = types.GenerateContentConfig(
+        response_mime_type="application/json",
+        response_schema=response_schema,
+        system_instruction=[types.Part.from_text(text=system_instruction)],
+        temperature=0
     )
     
-    # Extract JSON from the response
+    # Make the request
+    response = client_gem.models.generate_content(
+        model=model,
+        contents=[types.Content(role="user", parts=[types.Part.from_text(text=user_prompt)])],
+        config=generate_content_config
+    )
+    
     try:
-        # Extract JSON from potential markdown codeblock
-        match = re.search(r'```json\s*(.*?)\s*```', response.text, re.DOTALL)
-        if match:
-            json_str = match.group(1)
-        else:
-            # Try to find JSON without markdown
-            match = re.search(r'\{.*\}', response.text, re.DOTALL)
-            if match:
-                json_str = match.group(0)
-            else:
-                json_str = response.text
-        
-        result = json.loads(json_str)
+        # Parse the response directly as JSON
+        result = json.loads(response.text)
         
         # Normalize company name if needed
         company_mapping = {
