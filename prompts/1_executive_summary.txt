@@ -13,7 +13,7 @@ You will construct this 'Executive Summary' section with the following elements:
 You must output in MARKDOWN format and must follow this template.
 Markdown template:
 # [Company Name] Credit Report
-**Date of Report:** [today's date in anywhere-on-earth (AoE) timezone, in the format of <MONTH> <DAY>, <YEAR>]
+**Date of Report:** [today's date in anywhere-on-earth (AoE) timezone, in the format of <MONTH> <DAY>, <YEAR>, (today's date you identified from web search)]
 **Last Financial Reporting Period:** [Latest Financial Reporting Period, in the format of <MONTH> <DAY>, <YEAR>] [<H1 or H2> <yearr>, for example: if last financial reporting period is 31 December 2021, then it should be "H1 2022". For example: if last financial reporting period is 30 June 2018, then it should be "H2 2018"]
 
 ## Executive Summary

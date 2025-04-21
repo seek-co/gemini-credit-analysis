@@ -37,7 +37,6 @@ company_list = get_company_list()
 # create the chatbot object that will save the chat history
 chatbot = ChatBot(llm="gemini-2.5-flash-preview-04-17")
 
-
 def layout():
     return html.Div(
         children=[
@@ -55,22 +54,6 @@ def layout():
                 ],
             ),
             html.Br(),
-            # dbc.Row(
-            #     [
-            #         dbc.Col(dbc.Label("Quantitative Formula"), width='100%'),
-            #         dbc.Col(
-            #             dcc.Dropdown(
-            #                 id="quant_formula_dropdown",
-            #                 options=quant_list,
-            #                 # value=["AAPL", "NVDA", "MSFT", ],  # "GOOG", "AMZN"
-            #                 multi=True,
-            #                 optionHeight=50,
-            #                 style={'color': 'black'},
-            #                 disabled=True
-            #             ),
-            #         ),
-            #     ],
-            # ),
             html.Br(),
             dbc.Row(
                 dbc.Col(
@@ -330,17 +313,6 @@ def layout():
                             }
                         ),
                         html.Br(),
-                        # dbc.Row(
-                        #     [
-                        #         dbc.Col(dbc.Label("Quantitative Formula"), width='100%'),
-                        #         dbc.Col(
-                        #             [dcc.Textarea(
-                        #                 id="quant_formula", placeholder="Quantitative Formula", rows=3,
-                        #                 className="mb-3 border rounded form-control"
-                        #             )],
-                        #         ),
-                        #     ],
-                        # ),
                     ],
                     width=7
                 ),

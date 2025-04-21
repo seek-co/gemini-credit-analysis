@@ -151,7 +151,7 @@ class CreditReportGenerate:
             }
         ]
         response, _ = gemini_pro_loop_with_tools(
-            model_name="o1", reasoning_effort="high", input_messages=initial_input_messages,
+            model_name="gemini-2.5-flash-preview-04-17", input_messages=initial_input_messages,
             tools=[tl.gemini_web_search_tool, tl.rag_retrieval_tool],
             file_category=["ratings", "financial", "bond", "additional"],
             company_name=self.company_name
@@ -219,8 +219,7 @@ class CreditReportGenerate:
             },
         ]
         summary_response, summary_step_outputs = gemini_pro_loop_with_tools(
-            model_name="o1",
-            reasoning_effort="high",
+            model_name="gemini-2.5-flash-preview-04-17",
             input_messages=initial_input_messages,
             tools=[tl.rag_retrieval_tool, tl.gemini_web_search_tool, tl.get_financial_metrics_yf_api_tool],
             file_category=["financial", "ratings"]
@@ -246,7 +245,7 @@ class CreditReportGenerate:
         )
         initial_input_messages = [
             {
-                "role": "model",
+                "role": "user",
                 "content": [{"type": "input_text", "text": business_overview_prompt}]
             }
         ]
@@ -254,7 +253,7 @@ class CreditReportGenerate:
             tl.rag_retrieval_tool, tl.gemini_web_search_tool, tl.get_financial_metrics_yf_api_tool,
         ]
         response, step_outputs = gemini_pro_loop_with_tools(
-            model_name="o1", reasoning_effort="high", input_messages=initial_input_messages, tools=tools,
+            model_name="gemini-2.5-flash-preview-04-17", input_messages=initial_input_messages, tools=tools,
             file_category=["ratings", "financial"],
             company_name=self.company_name
         )
@@ -304,7 +303,7 @@ class CreditReportGenerate:
         ]
         # Step 1: create metric tables
         fin_health_response_1, fin_health_step_outputs_1 = gemini_pro_loop_with_tools(
-            model_name="o1", reasoning_effort="high", input_messages=initial_input_messages_1, tools=tools,
+            model_name="gemini-2.5-flash-preview-04-17", input_messages=initial_input_messages_1, tools=tools,
             file_category=["financial", "ratings", "additional"], company_name=self.company_name
         )
         # Step 2: write analysis
@@ -322,7 +321,7 @@ class CreditReportGenerate:
             },
         ]
         fin_health_response_2, fin_health_step_outputs_2 = gemini_pro_loop_with_tools(
-            model_name="o1", reasoning_effort="high", input_messages=initial_input_messages_2, tools=tools,
+            model_name="gemini-2.5-flash-preview-04-17", input_messages=initial_input_messages_2, tools=tools,
             file_category=["financial", "ratings"], company_name=self.company_name
         )
         fin_health_response = (
@@ -380,8 +379,7 @@ class CreditReportGenerate:
             },
         ]
         response_1, step_outputs_1 = gemini_pro_loop_with_tools(
-            model_name="o1",
-            reasoning_effort="high",
+            model_name="gemini-2.5-flash-preview-04-17",
             input_messages=initial_input_messages_1,
             tools=tools,
             file_category=["ratings", "bond"]
@@ -403,8 +401,7 @@ class CreditReportGenerate:
             },
         ]
         response_2, step_outputs_2 = gemini_pro_loop_with_tools(
-            model_name="o1",
-            reasoning_effort="high",
+            model_name="gemini-2.5-flash-preview-04-17",
             input_messages=initial_input_messages_2,
             tools=tools,
             file_category=["ratings", "bond"]
@@ -427,8 +424,7 @@ class CreditReportGenerate:
             },
         ]
         response_3, step_outputs_3 = gemini_pro_loop_with_tools(
-            model_name="o1",
-            reasoning_effort="high",
+            model_name="gemini-2.5-flash-preview-04-17",
             input_messages=initial_input_messages_3,
             tools=[tl.rag_retrieval_tool, tl.gemini_web_search_tool],
             file_category=["ratings", "bond"]
@@ -451,8 +447,7 @@ class CreditReportGenerate:
             },
         ]
         response_4, step_outputs_4 = gemini_pro_loop_with_tools(
-            model_name="o1",
-            reasoning_effort="high",
+            model_name="gemini-2.5-flash-preview-04-17",
             input_messages=initial_input_messages_4,
             tools=tools,
             file_category=["ratings", "bond"]
@@ -475,8 +470,7 @@ class CreditReportGenerate:
             },
         ]
         response_analyse, step_outputs_analyse = gemini_pro_loop_with_tools(
-            model_name="o1",
-            reasoning_effort="high",
+            model_name="gemini-2.5-flash-preview-04-17",
             input_messages=initial_input_messages_analyse,
             tools=tools,
             file_category=["ratings", "bond"]
@@ -542,8 +536,7 @@ class CreditReportGenerate:
             },
         ]
         cred_response, cred_step_outputs_1 = gemini_pro_loop_with_tools(
-            model_name="o1",
-            reasoning_effort="high",
+            model_name="gemini-2.5-flash-preview-04-17",
             input_messages=initial_input_messages_1,
             tools=tools,
             file_category=["ratings"]
@@ -565,8 +558,7 @@ class CreditReportGenerate:
             },
         ]
         cred_response, cred_step_outputs_2 = gemini_pro_loop_with_tools(
-            model_name="o1",
-            reasoning_effort="high",
+            model_name="gemini-2.5-flash-preview-04-17",
             input_messages=initial_input_messages_2,
             tools=tools,
             file_category=["financial"]
@@ -588,8 +580,7 @@ class CreditReportGenerate:
             },
         ]
         cred_response, cred_step_outputs_3 = gemini_pro_loop_with_tools(
-            model_name="o1",
-            reasoning_effort="high",
+            model_name="gemini-2.5-flash-preview-04-17",
             input_messages=initial_input_messages_3,
             tools=tools,
             file_category=["bond"]
@@ -611,8 +602,7 @@ class CreditReportGenerate:
             },
         ]
         cred_response, cred_step_outputs_4 = gemini_pro_loop_with_tools(
-            model_name="o1",
-            reasoning_effort="high",
+            model_name="gemini-2.5-flash-preview-04-17",
             input_messages=initial_input_messages_4,
             tools=tools,
             file_category=["additional"]
@@ -634,8 +624,7 @@ class CreditReportGenerate:
             },
         ]
         cred_response, cred_step_outputs_5 = gemini_pro_loop_with_tools(
-            model_name="o1",
-            reasoning_effort="high",
+            model_name="gemini-2.5-flash-preview-04-17",
             input_messages=initial_input_messages_5,
             tools=[tl.gemini_web_search_tool, tl.get_financial_metrics_yf_api_tool],
             file_category=None
@@ -713,7 +702,7 @@ def find_date_today_and_latest_fin_period(company_name):
         }
     ]
     response, step_outputs = gemini_pro_loop_with_tools(
-        model_name="o1", reasoning_effort="high", input_messages=initial_input_messages,
+        model_name="gemini-2.5-flash-preview-04-17", input_messages=initial_input_messages,
         tools=[tl.gemini_web_search_tool, tl.rag_retrieval_tool],
         file_category=["ratings", "financial", "bond", "additional"],
         company_name=company_name
@@ -744,7 +733,7 @@ def generate_business_overview(company_name, date_and_latest_fin):
         tl.get_financial_metrics_api_for_chatbot_tool
     ]
     response, step_outputs = gemini_pro_loop_with_tools(
-        model_name="o1", reasoning_effort="high", input_messages=initial_input_messages, tools=tools,
+        model_name="gemini-2.5-flash-preview-04-17", input_messages=initial_input_messages, tools=tools,
         file_category=["ratings", "financial"],
         company_name=company_name
     )
@@ -790,7 +779,7 @@ def generate_financial_health(company_name, date_and_latest_fin):
     ]
     # Step 1: create metric tables
     fin_health_response_1, fin_health_step_outputs_1 = gemini_pro_loop_with_tools(
-        model_name="o1", reasoning_effort="high", input_messages=initial_input_messages_1, tools=tools,
+        model_name="gemini-2.5-flash-preview-04-17", input_messages=initial_input_messages_1, tools=tools,
         file_category=["financial", "ratings"], company_name=company_name
     )
     # Step 2: write analysis
@@ -808,7 +797,7 @@ def generate_financial_health(company_name, date_and_latest_fin):
         },
     ]
     fin_health_response_2, fin_health_step_outputs_2 = gemini_pro_loop_with_tools(
-        model_name="o1", reasoning_effort="high", input_messages=initial_input_messages_2, tools=tools,
+        model_name="gemini-2.5-flash-preview-04-17", input_messages=initial_input_messages_2, tools=tools,
         file_category=["financial", "ratings"], company_name=company_name
     )
     fin_health_response = (
@@ -862,8 +851,7 @@ def generate_debt_structure(company_name, date_and_latest_fin):
         },
     ]
     response_1, step_outputs_1 = gemini_pro_loop_with_tools(
-        model_name="o1",
-        reasoning_effort="high",
+        model_name="gemini-2.5-flash-preview-04-17",
         input_messages=initial_input_messages_1,
         tools=tools,
         file_category=["ratings", "bond"]
@@ -885,8 +873,7 @@ def generate_debt_structure(company_name, date_and_latest_fin):
         },
     ]
     response_2, step_outputs_2 = gemini_pro_loop_with_tools(
-        model_name="o1",
-        reasoning_effort="high",
+        model_name="gemini-2.5-flash-preview-04-17",
         input_messages=initial_input_messages_2,
         tools=tools,
         file_category=["ratings", "bond"]
@@ -908,8 +895,7 @@ def generate_debt_structure(company_name, date_and_latest_fin):
         },
     ]
     response_3, step_outputs_3 = gemini_pro_loop_with_tools(
-        model_name="o1",
-        reasoning_effort="high",
+        model_name="gemini-2.5-flash-preview-04-17",
         input_messages=initial_input_messages_3,
         tools=[tl.rag_retrieval_tool, tl.gemini_web_search_tool],
         file_category=["ratings", "bond"]
@@ -932,8 +918,7 @@ def generate_debt_structure(company_name, date_and_latest_fin):
         },
     ]
     response_4, step_outputs_4 = gemini_pro_loop_with_tools(
-        model_name="o1",
-        reasoning_effort="high",
+        model_name="gemini-2.5-flash-preview-04-17",
         input_messages=initial_input_messages_4,
         tools=tools,
         file_category=["ratings", "bond"]
@@ -955,8 +940,7 @@ def generate_debt_structure(company_name, date_and_latest_fin):
         },
     ]
     response_analyse, step_outputs_analyse = gemini_pro_loop_with_tools(
-        model_name="o1",
-        reasoning_effort="high",
+        model_name="gemini-2.5-flash-preview-04-17",
         input_messages=initial_input_messages_analyse,
         tools=tools,
         file_category=["ratings", "bond"]
@@ -1017,8 +1001,7 @@ def generate_credit_risk(company_name, date_and_latest_fin):
         },
     ]
     cred_response, cred_step_outputs_1 = gemini_pro_loop_with_tools(
-        model_name="o1",
-        reasoning_effort="high",
+        model_name="gemini-2.5-flash-preview-04-17",
         input_messages=initial_input_messages_1,
         tools=tools,
         file_category=["ratings"]
@@ -1040,8 +1023,7 @@ def generate_credit_risk(company_name, date_and_latest_fin):
         },
     ]
     cred_response, cred_step_outputs_2 = gemini_pro_loop_with_tools(
-        model_name="o1",
-        reasoning_effort="high",
+        model_name="gemini-2.5-flash-preview-04-17",
         input_messages=initial_input_messages_2,
         tools=tools,  #, tl.gemini_web_search_tool
         file_category=["financial"]
@@ -1063,8 +1045,7 @@ def generate_credit_risk(company_name, date_and_latest_fin):
         },
     ]
     cred_response, cred_step_outputs_3 = gemini_pro_loop_with_tools(
-        model_name="o1",
-        reasoning_effort="high",
+        model_name="gemini-2.5-flash-preview-04-17",
         input_messages=initial_input_messages_3,
         tools=tools,
         file_category=["additional"]
@@ -1086,8 +1067,7 @@ def generate_credit_risk(company_name, date_and_latest_fin):
         },
     ]
     cred_response, cred_step_outputs_4 = gemini_pro_loop_with_tools(
-        model_name="o1",
-        reasoning_effort="high",
+        model_name="gemini-2.5-flash-preview-04-17",
         input_messages=initial_input_messages_4,
         tools=[
             tl.gemini_web_search_tool, tl.get_financial_metrics_yf_api_tool,
@@ -1134,8 +1114,7 @@ def generate_executive_summary(company_name, date_and_latest_fin, credit_report_
         },
     ]
     summary_response, summary_step_outputs = gemini_pro_loop_with_tools(
-        model_name="o1",
-        reasoning_effort="high",
+        model_name="gemini-2.5-flash-preview-04-17",
         input_messages=initial_input_messages,
         tools=[tl.rag_retrieval_tool, tl.gemini_web_search_tool],  #, gemini_web_search_tool
         file_category=["financial", "ratings"]

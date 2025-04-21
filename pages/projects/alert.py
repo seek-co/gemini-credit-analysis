@@ -17,8 +17,8 @@ if not bool(os.getenv("PRODUCTION_MODE")):
 
 
 # Email configuration
-EMAIL_ADDRESS = os.getenv("GMAIL_SENDER_EMAIL", "biggriffin640@gmail.com")
-EMAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "pbet zpha icaq qfdi")
+EMAIL_ADDRESS = os.getenv("GMAIL_SENDER_EMAIL")
+EMAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 
 # Function to send email using smtplib
 def send_email(subject, body, to_email):
@@ -31,7 +31,6 @@ def send_email(subject, body, to_email):
     try:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
             smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-            print("Sending email...", "EMAIL_ADDRESS", EMAIL_ADDRESS, "EMAIL_PASSWORD", EMAIL_PASSWORD, "body", body)
             smtp.send_message(msg)
         return True
     except Exception as e:
@@ -257,7 +256,6 @@ for i, news in enumerate(news_sasol_ls):
                     company_name=company_name, news_title=news_title, news_body=news_body,
                     sasol_true_rpt=sasol_true_rpt
                 )
-                print(response_json)
                 if isinstance(response_json, dict):
                     if response_json['credit_impact'] != "neutral":
                         email_subject = f"Possible {response_json['credit_impact']} opportunity for {company_name}"

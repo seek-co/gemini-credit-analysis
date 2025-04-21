@@ -50,11 +50,8 @@ if not bool(os.getenv("PRODUCTION_MODE")):
     from dotenv import load_dotenv
     load_dotenv()
     
-print("From env:", os.getenv("GEMINI_API_KEY"))
-# Check what's actually in the .env file
 import dotenv
 env_values = dotenv.dotenv_values()
-print("From .env file:", env_values.get("GEMINI_API_KEY"))
 
 client_gemini = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -718,7 +715,6 @@ def rag_search_and_retrieval(company_name, query, file_category=None, alpha=0.75
     )
     retrieval_str = parse_search_response_objects(search_response_objects=search_objects)
     client_weaviate.close()
-    print(f"retrieval_str: {retrieval_str}")
     return retrieval_str #, response_object_json_ls
 
 
@@ -1299,10 +1295,21 @@ def gemini_pro_loop_with_tools(
                     ))]
                 ))
             elif msg.get('type') == 'function_call_output':
+                function_name = msg.get('name')
+                if not function_name:
+                    # Try to find the most recent function_call in the history
+                    for prev_msg in reversed(input_messages[:input_messages.index(msg)]):
+                        if prev_msg.get('type') == 'function_call':
+                            function_name = prev_msg['name']
+                            break
+                
+                if not function_name:
+                    function_name = 'unknown_function'  # Fallback, though this shouldn't happen
+                
                 gemini_messages.append(types.Content(
                     role='user',
                     parts=[types.Part.from_function_response(
-                        name=msg.get('name', ''),  # Use empty string as fallback if name not provided
+                        name=function_name,
                         response={"result": msg['output']}
                     )]
                 ))
@@ -1315,7 +1322,7 @@ def gemini_pro_loop_with_tools(
                 ))
 
         # Configure tool usage
-        tool_config_mode = 'ANY' if step_number < len(tools) else 'AUTO'
+        tool_config_mode = 'AUTO'
         tool_config = types.ToolConfig(
             function_calling_config=types.FunctionCallingConfig(mode=tool_config_mode)
         )
@@ -1324,7 +1331,6 @@ def gemini_pro_loop_with_tools(
             tool_config=tool_config
         )
 
-        print("----------gemini_messages", gemini_messages)
         response = client_gemini.models.generate_content(
             model=model_name,
             contents=gemini_messages,
@@ -1332,64 +1338,68 @@ def gemini_pro_loop_with_tools(
         )
         step_number += 1
 
-        if response.candidates[0].content.parts[0].function_call:
-            function_call = response.candidates[0].content.parts[0].function_call
-            print(f"Function to call: {function_call}")
-            func_step_resp_ls = []
-        
-            tool_name = function_call.name
-            tool_args = function_call.args
-            if tool_name == "rag_search_and_retrieval":
-                if company_name is not None:
-                    tool_args.update({"company_name": company_name})
-                if file_category is not None:
-                    tool_args.update({"file_category": file_category})
-            elif (tool_name == "get_financial_metrics_yf_api_for_table" or
-                    tool_name == "get_financial_metrics_yf_api" or
-                    tool_name == "get_financial_metrics_api" or
-                    tool_name == "get_financial_metrics_api_for_chatbot"):
-                if company_name is not None:
-                    tool_args.update({"company_name": company_name})
-                tool_args.update({"from_api": False})
-            elif tool_name == "get_bond_data_api" or tool_name == "get_bond_data_api_for_chatbot":
-                if company_name is not None:
-                    tool_args.update({"company_name": company_name})
-                tool_args.update({"from_api": False})
+        # Check for function calls in any part of the response
+        function_calls_found = False
+        if response.candidates[0].content:
+            for part in response.candidates[0].content.parts:
+                if hasattr(part, 'function_call') and part.function_call:
+                    function_calls_found = True
+                    function_call = part.function_call
+                    func_step_resp_ls = []
+                
+                    tool_name = function_call.name
+                    tool_args = function_call.args
+                    if tool_name == "rag_search_and_retrieval":
+                        if company_name is not None:
+                            tool_args.update({"company_name": company_name})
+                        if file_category is not None:
+                            tool_args.update({"file_category": file_category})
+                    elif (tool_name == "get_financial_metrics_yf_api_for_table" or
+                            tool_name == "get_financial_metrics_yf_api" or
+                            tool_name == "get_financial_metrics_api" or
+                            tool_name == "get_financial_metrics_api_for_chatbot"):
+                        if company_name is not None:
+                            tool_args.update({"company_name": company_name})
+                        tool_args.update({"from_api": False})
+                    elif tool_name == "get_bond_data_api" or tool_name == "get_bond_data_api_for_chatbot":
+                        if company_name is not None:
+                            tool_args.update({"company_name": company_name})
+                        tool_args.update({"from_api": False})
 
-            function_result = process_tool_call(tool_name=tool_name, tool_input=tool_args)
-            
-            print("Function calling result", function_result)
-            input_messages.append({
-                "type": "function_call",
-                "name": tool_name,
-                "arguments": json.dumps(tool_args)
-            })
-            input_messages.append({
-                "type": "function_call_output",
-                "output": str(function_result[0] if tool_name == "rag_search_and_retrieval" else function_result)
-            })
-            if tool_name == "rag_search_and_retrieval":
-                input_file_data_ls = []
-                for obj in function_result[1]:
-                    if ((obj['content_type'] == "image" or obj['content_type'] == 'table')
-                            and 'mime_type' in obj.keys() and 'base64_encoding' in obj.keys()):
-                        if obj['mime_type'] is not None and obj['base64_encoding'] is not None:
-                            input_file_data_ls.append({
-                                "type": "input_file",
-                                "filename": os.path.basename(os.path.normpath(obj['source_document'])),
-                                "file_data": f"data:{obj['mime_type']};base64,{obj['base64_encoding']}",
-                            })
-                input_messages.append({"role": "user", "content": input_file_data_ls})
-            # append intermediate func calling steps
-            func_step_resp_ls.append({
-                "step_number": str(step_number),
-                "calling": str(f"{tool_name}(**{json.dumps(tool_args)})"),
-                "output": str(function_result)
-            })
-            step_responses.extend(func_step_resp_ls)
-        else:
-            print("No function call found in the response.")
-            print(response.text)
+                    function_result = process_tool_call(tool_name=tool_name, tool_input=tool_args)
+                    
+                    input_messages.append({
+                        "type": "function_call",
+                        "name": tool_name,
+                        "arguments": json.dumps(tool_args)
+                    })
+                    input_messages.append({
+                        "type": "function_call_output",
+                        "name": tool_name,
+                        "output": str(function_result[0] if tool_name == "rag_search_and_retrieval" else function_result)
+                    })
+                    if tool_name == "rag_search_and_retrieval":
+                        input_file_data_ls = []
+                        for obj in function_result[1]:
+                            if ((obj['content_type'] == "image" or obj['content_type'] == 'table')
+                                    and 'mime_type' in obj.keys() and 'base64_encoding' in obj.keys()):
+                                if obj['mime_type'] is not None and obj['base64_encoding'] is not None:
+                                    input_file_data_ls.append({
+                                        "type": "input_file",
+                                        "filename": os.path.basename(os.path.normpath(obj['source_document'])),
+                                        "file_data": f"data:{obj['mime_type']};base64,{obj['base64_encoding']}",
+                                    })
+                        input_messages.append({"role": "user", "content": input_file_data_ls})
+                    # append intermediate func calling steps
+                    func_step_resp_ls.append({
+                        "step_number": str(step_number),
+                        "calling": str(f"{tool_name}(**{json.dumps(tool_args)})"),
+                        "output": str(function_result)
+                    })
+                    step_responses.extend(func_step_resp_ls)
+                    break  # Process only the first function call found
+                
+        if not function_calls_found:
             response_str = response.text
             step_responses.append({
                 "step_number": str(step_number),
@@ -1438,7 +1448,6 @@ class ReasoningToolSchema:
                     "company_name",
                     "query"
                 ]
-                # additionalProperties removed
             }
         )
         self.gemini_web_search_tool = types.FunctionDeclaration(
@@ -1460,7 +1469,6 @@ class ReasoningToolSchema:
                 "required": [
                     "search_input",
                 ]
-                # additionalProperties removed
             }
         )
         self.get_financial_metrics_yf_api_for_table_tool = types.FunctionDeclaration(
@@ -1491,7 +1499,6 @@ class ReasoningToolSchema:
                 "required": [
                     "company_name",
                 ]
-                # additionalProperties removed
             }
         )
         self.get_financial_metrics_yf_api_tool = types.FunctionDeclaration(
@@ -1502,7 +1509,67 @@ class ReasoningToolSchema:
                 "different financial metrics. This function returns text CSV string response with the financial metric "
                 "columns given below extracted from API. The financial metrics available are in these columns "
                 "with self-explanatory metric column names: \nFiscal Date Ending, Tax Effect Of Unusual Items, "
-                # ... (rest of long description) ...
+                "Tax Rate For Calcs, Normalized EBITDA, Total Unusual Items, Total Unusual Items Excluding Goodwill, "
+                "Net Income From Continuing Operation Net Minority Interest, Reconciled Depreciation, "
+                "Reconciled Cost Of Revenue, EBITDA, EBIT, Net Interest Income, Interest Expense, Interest Income, "
+                "Normalized Income, Net Income From Continuing And Discontinued Operation, Total Expenses, "
+                "Rent Expense Supplemental, Total Operating Income As Reported, Diluted Average Shares, "
+                "Basic Average Shares, Diluted EPS, Basic EPS, Diluted NI Availto Com Stockholders, "
+                "Average Dilution Earnings, Net Income Common Stockholders, Net Income, Minority Interests, "
+                "Net Income Including Noncontrolling Interests, Net Income Continuous Operations, Tax Provision, "
+                "Pretax Income, Other Income Expense, Special Income Charges, Write Off, "
+                "Earnings From Equity Interest, Gain On Sale Of Security, Net Non Operating Interest Income Expense, "
+                "Total Other Finance Cost, Interest Expense Non Operating, Interest Income Non Operating, "
+                "Operating Income, Operating Expense, Other Operating Expenses, Provision For Doubtful Accounts, "
+                "Selling General And Administration, Selling And Marketing Expense, General And Administrative Expense, "
+                "Other Gand A, Insurance And Claims, Rent And Landing Fees, Salaries And Wages, Gross Profit, "
+                "Cost Of Revenue, Total Revenue, Operating Revenue, Treasury Shares Number, Ordinary Shares Number, "
+                "Share Issued, Net Debt, Total Debt, Tangible Book Value, Invested Capital, Working Capital, "
+                "Net Tangible Assets, Capital Lease Obligations, Common Stock Equity, Total Capitalization, "
+                "Total Equity Gross Minority Interest, Minority Interest, Stockholders Equity, Other Equity Interest, "
+                "Gains Losses Not Affecting Retained Earnings, Other Equity Adjustments, "
+                "Foreign Currency Translation Adjustments, Minimum Pension Liabilities, Unrealized Gain Loss, "
+                "Retained Earnings, Capital Stock, Common Stock, Total Liabilities Net Minority Interest, "
+                "Total Non Current Liabilities Net Minority Interest, Other Non Current Liabilities, "
+                "Employee Benefits, Non Current Pension And Other Postretirement Benefit Plans, "
+                "Non Current Deferred Liabilities, Non Current Deferred Revenue, Non Current Deferred Taxes Liabilities, "
+                "Long Term Debt And Capital Lease Obligation, Long Term Capital Lease Obligation, Long Term Debt, "
+                "Long Term Provisions, Current Liabilities, Other Current Liabilities, Current Deferred Liabilities, "
+                "Current Deferred Revenue, Current Debt And Capital Lease Obligation, Current Capital Lease Obligation, "
+                "Current Debt, Other Current Borrowings, Line Of Credit, Current Provisions, "
+                "Payables And Accrued Expenses, Current Accrued Expenses, Payables, Other Payable, "
+                "Dueto Related Parties Current, Total Tax Payable, Accounts Payable, Total Assets, "
+                "Total Non Current Assets, Other Non Current Assets, Defined Pension Benefit, "
+                "Non Current Prepaid Assets, Non Current Deferred Assets, Non Current Deferred Taxes Assets, "
+                "Non Current Accounts Receivable, Financial Assets, Investments And Advances, Other Investments, "
+                "Investmentin Financial Assets, Available For Sale Securities, Long Term Equity Investment, "
+                "Investmentsin Joint Venturesat Cost, Investments In Other Ventures Under Equity Method, "
+                "Investmentsin Associatesat Cost, Goodwill And Other Intangible Assets, Net PPE, "
+                "Accumulated Depreciation, Gross PPE, Construction In Progress, Other Properties, "
+                "Machinery Furniture Equipment, Buildings And Improvements, Land And Improvements, "
+                "Properties, Current Assets, Other Current Assets, Assets Held For Sale Current, Restricted Cash, "
+                "Prepaid Assets, Inventory, Finished Goods, Work In Process, Raw Materials, Receivables, "
+                "Receivables Adjustments Allowances, Other Receivables, Duefrom Related Parties Current, "
+                "Taxes Receivable, Accounts Receivable, Allowance For Doubtful Accounts Receivable, "
+                "Gross Accounts Receivable, Cash Cash Equivalents And Short Term Investments, "
+                "Other Short Term Investments, Cash And Cash Equivalents, Free Cash Flow, Repayment Of Debt, "
+                "Issuance Of Debt, Capital Expenditure, End Cash Position, Other Cash Adjustment Outside Changein Cash, "
+                "Beginning Cash Position, Effect Of Exchange Rate Changes, Changes In Cash, Financing Cash Flow, "
+                "Cash Flow From Continuing Financing Activities, Net Issuance Payments Of Debt, "
+                "Net Short Term Debt Issuance, Short Term Debt Payments, Short Term Debt Issuance, "
+                "Net Long Term Debt Issuance, Long Term Debt Payments, Long Term Debt Issuance, Investing Cash Flow, "
+                "Cash Flow From Continuing Investing Activities, Net Other Investing Changes, "
+                "Net Investment Purchase And Sale, Sale Of Investment, Purchase Of Investment, "
+                "Net Business Purchase And Sale, Sale Of Business, Purchase Of Business, "
+                "Net Intangibles Purchase And Sale, Purchase Of Intangibles, Net PPE Purchase And Sale, "
+                "Purchase Of PPE, Operating Cash Flow, Cash Flow From Continuing Operating Activities, "
+                "Taxes Refund Paid, Interest Received Cfo, Interest Paid Cfo, Dividend Received Cfo, "
+                "Dividend Paid Cfo, Change In Working Capital, Change In Payables And Accrued Expense, "
+                "Change In Payable, Change In Account Payable, Change In Inventory, Change In Receivables, "
+                "Changes In Account Receivables, Other Non Cash Items, Stock Based Compensation, "
+                "Provisionand Write Offof Assets, Asset Impairment Charge, Depreciation Amortization Depletion, "
+                "Depreciation And Amortization, Operating Gains Losses, Pension And Employee Benefit Expense, "
+                "Earnings Losses From Equity Investments, Net Foreign Currency Exchange Gain Loss, "
                 "Net Income From Continuing Operations, Currency \n\n"
             ),
             parameters={
@@ -1523,7 +1590,6 @@ class ReasoningToolSchema:
                 "required": [
                     "company_name",
                 ]
-                # additionalProperties removed
             }
         )
         self.get_financial_metrics_api_tool = types.FunctionDeclaration(
@@ -1573,7 +1639,6 @@ class ReasoningToolSchema:
                     "previous_year_fiscal_date",
                     "previous_half_year_fiscal_date"
                 ]
-                # additionalProperties removed
             }
         )
         self.get_financial_metrics_api_for_chatbot_tool = types.FunctionDeclaration(
@@ -1584,8 +1649,30 @@ class ReasoningToolSchema:
                 "different financial metrics. This function returns text CSV string response with the financial metric "
                 "columns given below extracted from API. The financial metrics available are in these columns "
                 "with self-explanatory metric column names: \nfiscalDateEnding, grossProfit, totalRevenue, "
-                 # ... (rest of long description) ...
-                "netDebtToEbitdaRatio, interestCoverageRatio, ebitdaMargin, netIncomeMargin \n\n"
+                "costOfRevenue, costofGoodsAndServicesSold, operatingIncome, sellingGeneralAndAdministrative, "
+                "researchAndDevelopment, operatingExpenses, investmentIncomeNet, netInterestIncome, interestIncome, "
+                "interestExpense, nonInterestIncome, otherNonOperatingIncome, depreciation, "
+                "depreciationAndAmortization, incomeBeforeTax, incomeTaxExpense, interestAndDebtExpense, "
+                "netIncomeFromContinuingOperations, comprehensiveIncomeNetOfTax, ebit, ebitda, totalAssets, "
+                "totalCurrentAssets, cashAndCashEquivalentsAtCarryingValue, cashAndShortTermInvestments, "
+                "inventory, currentNetReceivables, totalNonCurrentAssets, propertyPlantEquipment, "
+                "accumulatedDepreciationAmortizationPPE, intangibleAssets, intangibleAssetsExcludingGoodwill, "
+                "goodwill, investments, longTermInvestments, shortTermInvestments, otherCurrentAssets, "
+                "otherNonCurrentAssets, totalLiabilities, totalCurrentLiabilities, currentAccountsPayable, "
+                "deferredRevenue, currentDebt, shortTermDebt, totalNonCurrentLiabilities, capitalLeaseObligations, "
+                "longTermDebt, currentLongTermDebt, longTermDebtNoncurrent, shortLongTermDebtTotal, "
+                "otherCurrentLiabilities, otherNonCurrentLiabilities, totalShareholderEquity, treasuryStock, "
+                "retainedEarnings, commonStock, commonStockSharesOutstanding, operatingCashflow, "
+                "paymentsForOperatingActivities, proceedsFromOperatingActivities, changeInOperatingLiabilities, "
+                "changeInOperatingAssets, depreciationDepletionAndAmortization, capitalExpenditures, "
+                "changeInReceivables, changeInInventory, profitLoss, cashflowFromInvestment, cashflowFromFinancing, "
+                "proceedsFromRepaymentsOfShortTermDebt, paymentsForRepurchaseOfCommonStock, "
+                "paymentsForRepurchaseOfEquity, paymentsForRepurchaseOfPreferredStock, dividendPayout, "
+                "dividendPayoutCommonStock, dividendPayoutPreferredStock, proceedsFromIssuanceOfCommonStock, "
+                "proceedsFromIssuanceOfLongTermDebtAndCapitalSecuritiesNet, proceedsFromIssuanceOfPreferredStock, "
+                "proceedsFromRepurchaseOfEquity, proceedsFromSaleOfTreasuryStock, changeInCashAndCashEquivalents, "
+                "changeInExchangeRate, netIncome, reportedCurrency, currentRatio, netDebt, "
+                "debtToEbitdaRatio, netDebtToEbitdaRatio, interestCoverageRatio, ebitdaMargin, netIncomeMargin \n\n"
             ),
             parameters={
                 "type": "object",
@@ -1605,7 +1692,6 @@ class ReasoningToolSchema:
                 "required": [
                     "company_name",
                 ]
-                # additionalProperties removed
             }
         )
         self.get_bonds_api_tool = types.FunctionDeclaration(
@@ -1646,7 +1732,6 @@ class ReasoningToolSchema:
                     "company_name",
                     "date_today",
                 ]
-                # additionalProperties removed
             }
         )
         self.get_bonds_api_for_chatbot_tool = types.FunctionDeclaration(
@@ -1657,7 +1742,22 @@ class ReasoningToolSchema:
                 "of a particular bond. This function returns text CSV string response with the bond detail "
                 "columns given below extracted from API. The bond information available are in these columns "
                 "with self-explanatory metric column names: \nid, formal_emitent_id, bbgid, bbgid_ticker, cfi_code, "
-                 # ... (rest of long description) ...
+                "cfi_code_144a, convertable, coupon_type_id, updating_date, cupon_period, currency_id, currency_name, "
+                "cusip_144a, cusip_regs, date_of_end_placing, date_of_start_circulation, date_of_start_placing, "
+                "bond_name, document_rus, document_pol, document_ita, early_redemption_date, emission_cupon_basis_id, "
+                "emission_cupon_basis_title, emission_emitent_id, emitent_id, emitent_branch_id, "
+                "emitent_branch_name_eng, emitent_branch_name_rus, floating_rate, guarantor_id, integral_multiple, "
+                "isin_code,isin_code_144a, isin_code_3, kind_id, margin, maturity_date, micex_shortname, "
+                "nominal_price, initial_nominal_price, number_of_emission, number_of_emission_eng, "
+                "outstanding_nominal_price, reference_rate_id, reference_rate_name_eng, reference_rate_name_rus, "
+                "registration_date, settlement_date, state_reg_number, status_id, subkind_id, subordinated_debt, "
+                "vid_id, coupon_rate, cupon_rus, bond_kind_name, kind_name_rus, kind_name_pol, kind_name_ita, "
+                "emitent_country, emitent_country_region_id, emitent_country_subregion_id, emitent_name_eng, "
+                "emitent_name_rus, offert_date, offert_date_put, offert_date_call, update_time, mortgage_bonds, "
+                "restructing, restructing_date, perpetual, amount, secured_debt, eurobonds_nominal, structured_note, "
+                "emitent_inn, formal_emitent_name_rus, emitent_type_name_rus, emitent_type, announced_volume_new, "
+                "placed_volume_new, outstanding_volume, indexation_eng, indexation_rus, order_book, "
+                "number_of_trades_on_issue_date, emitent_type_name_eng, emitent_country_name_eng, "
                 "emitent_country_name_rus"
             ),
             parameters={
@@ -1678,7 +1778,6 @@ class ReasoningToolSchema:
                 "required": [
                     "company_name",
                 ]
-                # additionalProperties removed
             }
         )
 
@@ -1686,18 +1785,18 @@ class ReasoningToolSchema:
 def gcloud_connect_credentials():
     return service_account.Credentials.from_service_account_info(
         {
-        "type": "service_account",
-        "project_id": "credit-ai-project-456311",
-        "private_key_id": "b6f4c7790995f0e2177389609ae15d7a760942e0",
-        "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCL7HhgcU2KJCUn\nBUbSBywRgknYf++iu3qmZCic1W4A3ERtESKdRFA/FWuFE4uccb4Fm0e5f/viuYx0\nds7Khqj1Nbbsa4ZWMlpKALxB3DVgzKJFbKkCIc7s61oZeLvopsRxB2xSdzgES/vT\nTx8J9D6LoYnBqlVjJBWSZDUbPKAmDA5C1/qamd8HnMMMYI8zJDLWCl5COebFGfZW\nnI/sQNLw+wLbl9dqcdGA4wFeWTaoaT8kIgkc7q2qpJoJVe4CRbwb3E7PAaGc6vx1\nfy4HBPHn4ZdRRSrlZ3Nu7TOvWuCDS4BQLVBwvTlT41xMHzR3YGboBhBW3zuqrQhS\ngq4phE+nAgMBAAECggEAA1AOUYo2yCYVUxhgfHYUm9C2QUMi80fCnmnePeHq5s5Q\nOGmgpJFXedOrmTNedme8lF/NK1EiYrqURRwC+iLroR9fPOp9L1E/d5ao3lsbHTcu\nQe9R2Qd5exZ49zcEJXy9R3r7gsBPBs43U66aqrh21DhEDXe9tpX5UZJZx4YZ7Iyk\nW1boCNRREcaJuF82IFSirR7XsPsL43AuLtbFtLXwiMofZlA+eKzGcH3HzNGq8KwA\nnwuEQxjhArqFGQ6PCrZd6HY0zRaI1XkGwC8AOznkbeo1DcL8yRCraMiEfsYh2kvy\n7ypsmkRBXOAubmSbAeKRXOWIH+R8w1VeE6GlRIpEUQKBgQC/+Yr1hSA/rJlECM81\nD8JYnJdpX9ngDMO8zZMHOQqXapfdnvXCJ4WS2pOhnGwhUEe11FEOcP4wKrprj0gz\nd2V5QTM4wtB9bWeFzJroeJHKUJ99YYuI6S7JVSuTv29pcD6tYI91VW4AW9f5Rpk0\n2SVwWU8r+X8ubirhnROqQSokHQKBgQC6lub18sTgBEsNrhSrMPvamDu3NPJlFLhs\ng6p5rBOkmld/tkHc4YElj19+vi+lwRuU0gEjjdrTXBcWdTn++BDMUeWpEnBx3LYL\nvnKOtX/RGfVA8gc4YeE0+zZLHeG57Ip52t4bzRgcVn6ZTs5t8vlJ7uvqqdR+QHJX\n6MI4aP1vkwKBgQCZSb7FcPlhHoZ7JrWdXuoGK3NTNrAYENkypsuh1tA4O2rsEYOW\n9kvYCSQcxXQp3ZqE+/WFHIA7IcMdI5m5Trr96SvnRNeJb5Rb6BZBThTLgTj4uqza\nM6eiJ5nWLePeQzwo4JNsUzy0mKGJb+/hnQoh/Y4URPJitqES6YPMTKBDmQKBgBRG\n5d6AfWiizs0zx8c60YPV21dzh4v4jnosbNBAJPpUU4HreojYcMJ2LDiHzoHC1I59\nq+YDOm6RqWilYKIWryylEcIn4NRe2eG41pYvny5IFeDy7FnyORka27GaE7eyvvGz\nGUQIK8CYnbVnXQORzgl8z2J3BkKaGlL3VnPu5OvFAoGAZ7kzeaJTFcGM1ZWiOrpo\nUhWBl4t3lqL9b7bKDL9lYisODUzQJ5t/4E+Sej66Ny5XeqxEFpMWDibmmPUMEmOG\nkWlgvDK1Z+1V9yDof0YDYyTqetu/e3KoX7jbvC8gUYW/+0AjnX8xVqB7i1Qz5PQi\n+gjqXZQNUF9dyzimFygX074=\n-----END PRIVATE KEY-----\n",
-        "client_email": "credit-ai-sa@credit-ai-project-456311.iam.gserviceaccount.com",
-        "client_id": "117752690884806967717",
-        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-        "token_uri": "https://oauth2.googleapis.com/token",
-        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-        "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/credit-ai-sa%40credit-ai-project-456311.iam.gserviceaccount.com",
-        "universe_domain": "googleapis.com"
-        }
+            "type": "service_account",
+            "project_id": "credit-ai-project-456311",
+            "private_key_id": "b6f4c7790995f0e2177389609ae15d7a760942e0",
+            "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCL7HhgcU2KJCUn\nBUbSBywRgknYf++iu3qmZCic1W4A3ERtESKdRFA/FWuFE4uccb4Fm0e5f/viuYx0\nds7Khqj1Nbbsa4ZWMlpKALxB3DVgzKJFbKkCIc7s61oZeLvopsRxB2xSdzgES/vT\nTx8J9D6LoYnBqlVjJBWSZDUbPKAmDA5C1/qamd8HnMMMYI8zJDLWCl5COebFGfZW\nnI/sQNLw+wLbl9dqcdGA4wFeWTaoaT8kIgkc7q2qpJoJVe4CRbwb3E7PAaGc6vx1\nfy4HBPHn4ZdRRSrlZ3Nu7TOvWuCDS4BQLVBwvTlT41xMHzR3YGboBhBW3zuqrQhS\ngq4phE+nAgMBAAECggEAA1AOUYo2yCYVUxhgfHYUm9C2QUMi80fCnmnePeHq5s5Q\nOGmgpJFXedOrmTNedme8lF/NK1EiYrqURRwC+iLroR9fPOp9L1E/d5ao3lsbHTcu\nQe9R2Qd5exZ49zcEJXy9R3r7gsBPBs43U66aqrh21DhEDXe9tpX5UZJZx4YZ7Iyk\nW1boCNRREcaJuF82IFSirR7XsPsL43AuLtbFtLXwiMofZlA+eKzGcH3HzNGq8KwA\nnwuEQxjhArqFGQ6PCrZd6HY0zRaI1XkGwC8AOznkbeo1DcL8yRCraMiEfsYh2kvy\n7ypsmkRBXOAubmSbAeKRXOWIH+R8w1VeE6GlRIpEUQKBgQC/+Yr1hSA/rJlECM81\nD8JYnJdpX9ngDMO8zZMHOQqXapfdnvXCJ4WS2pOhnGwhUEe11FEOcP4wKrprj0gz\nd2V5QTM4wtB9bWeFzJroeJHKUJ99YYuI6S7JVSuTv29pcD6tYI91VW4AW9f5Rpk0\n2SVwWU8r+X8ubirhnROqQSokHQKBgQC6lub18sTgBEsNrhSrMPvamDu3NPJlFLhs\ng6p5rBOkmld/tkHc4YElj19+vi+lwRuU0gEjjdrTXBcWdTn++BDMUeWpEnBx3LYL\nvnKOtX/RGfVA8gc4YeE0+zZLHeG57Ip52t4bzRgcVn6ZTs5t8vlJ7uvqqdR+QHJX\n6MI4aP1vkwKBgQCZSb7FcPlhHoZ7JrWdXuoGK3NTNrAYENkypsuh1tA4O2rsEYOW\n9kvYCSQcxXQp3ZqE+/WFHIA7IcMdI5m5Trr96SvnRNeJb5Rb6BZBThTLgTj4uqza\nM6eiJ5nWLePeQzwo4JNsUzy0mKGJb+/hnQoh/Y4URPJitqES6YPMTKBDmQKBgBRG\n5d6AfWiizs0zx8c60YPV21dzh4v4jnosbNBAJPpUU4HreojYcMJ2LDiHzoHC1I59\nq+YDOm6RqWilYKIWryylEcIn4NRe2eG41pYvny5IFeDy7FnyORka27GaE7eyvvGz\nGUQIK8CYnbVnXQORzgl8z2J3BkKaGlL3VnPu5OvFAoGAZ7kzeaJTFcGM1ZWiOrpo\nUhWBl4t3lqL9b7bKDL9lYisODUzQJ5t/4E+Sej66Ny5XeqxEFpMWDibmmPUMEmOG\nkWlgvDK1Z+1V9yDof0YDYyTqetu/e3KoX7jbvC8gUYW/+0AjnX8xVqB7i1Qz5PQi\n+gjqXZQNUF9dyzimFygX074=\n-----END PRIVATE KEY-----\n",
+            "client_email": "credit-ai-sa@credit-ai-project-456311.iam.gserviceaccount.com",
+            "client_id": "117752690884806967717",
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_x509_cert_url": os.getenv("GCLOUD_CLIENT_X509_CERT_URL"),
+            "universe_domain": "googleapis.com"
+        },
     )
 
 def delete_gcs_folder(credentials, bucket_name, folder_name):
