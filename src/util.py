@@ -1786,11 +1786,11 @@ def gcloud_connect_credentials():
     return service_account.Credentials.from_service_account_info(
         {
             "type": "service_account",
-            "project_id": "credit-ai-project-456311",
-            "private_key_id": "b6f4c7790995f0e2177389609ae15d7a760942e0",
+            "project_id": os.getenv("GCLOUD_PROJECT_ID"),
+            "private_key_id": os.getenv("GCLOUD_PRIVATE_KEY_ID"),
             "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCL7HhgcU2KJCUn\nBUbSBywRgknYf++iu3qmZCic1W4A3ERtESKdRFA/FWuFE4uccb4Fm0e5f/viuYx0\nds7Khqj1Nbbsa4ZWMlpKALxB3DVgzKJFbKkCIc7s61oZeLvopsRxB2xSdzgES/vT\nTx8J9D6LoYnBqlVjJBWSZDUbPKAmDA5C1/qamd8HnMMMYI8zJDLWCl5COebFGfZW\nnI/sQNLw+wLbl9dqcdGA4wFeWTaoaT8kIgkc7q2qpJoJVe4CRbwb3E7PAaGc6vx1\nfy4HBPHn4ZdRRSrlZ3Nu7TOvWuCDS4BQLVBwvTlT41xMHzR3YGboBhBW3zuqrQhS\ngq4phE+nAgMBAAECggEAA1AOUYo2yCYVUxhgfHYUm9C2QUMi80fCnmnePeHq5s5Q\nOGmgpJFXedOrmTNedme8lF/NK1EiYrqURRwC+iLroR9fPOp9L1E/d5ao3lsbHTcu\nQe9R2Qd5exZ49zcEJXy9R3r7gsBPBs43U66aqrh21DhEDXe9tpX5UZJZx4YZ7Iyk\nW1boCNRREcaJuF82IFSirR7XsPsL43AuLtbFtLXwiMofZlA+eKzGcH3HzNGq8KwA\nnwuEQxjhArqFGQ6PCrZd6HY0zRaI1XkGwC8AOznkbeo1DcL8yRCraMiEfsYh2kvy\n7ypsmkRBXOAubmSbAeKRXOWIH+R8w1VeE6GlRIpEUQKBgQC/+Yr1hSA/rJlECM81\nD8JYnJdpX9ngDMO8zZMHOQqXapfdnvXCJ4WS2pOhnGwhUEe11FEOcP4wKrprj0gz\nd2V5QTM4wtB9bWeFzJroeJHKUJ99YYuI6S7JVSuTv29pcD6tYI91VW4AW9f5Rpk0\n2SVwWU8r+X8ubirhnROqQSokHQKBgQC6lub18sTgBEsNrhSrMPvamDu3NPJlFLhs\ng6p5rBOkmld/tkHc4YElj19+vi+lwRuU0gEjjdrTXBcWdTn++BDMUeWpEnBx3LYL\nvnKOtX/RGfVA8gc4YeE0+zZLHeG57Ip52t4bzRgcVn6ZTs5t8vlJ7uvqqdR+QHJX\n6MI4aP1vkwKBgQCZSb7FcPlhHoZ7JrWdXuoGK3NTNrAYENkypsuh1tA4O2rsEYOW\n9kvYCSQcxXQp3ZqE+/WFHIA7IcMdI5m5Trr96SvnRNeJb5Rb6BZBThTLgTj4uqza\nM6eiJ5nWLePeQzwo4JNsUzy0mKGJb+/hnQoh/Y4URPJitqES6YPMTKBDmQKBgBRG\n5d6AfWiizs0zx8c60YPV21dzh4v4jnosbNBAJPpUU4HreojYcMJ2LDiHzoHC1I59\nq+YDOm6RqWilYKIWryylEcIn4NRe2eG41pYvny5IFeDy7FnyORka27GaE7eyvvGz\nGUQIK8CYnbVnXQORzgl8z2J3BkKaGlL3VnPu5OvFAoGAZ7kzeaJTFcGM1ZWiOrpo\nUhWBl4t3lqL9b7bKDL9lYisODUzQJ5t/4E+Sej66Ny5XeqxEFpMWDibmmPUMEmOG\nkWlgvDK1Z+1V9yDof0YDYyTqetu/e3KoX7jbvC8gUYW/+0AjnX8xVqB7i1Qz5PQi\n+gjqXZQNUF9dyzimFygX074=\n-----END PRIVATE KEY-----\n",
-            "client_email": "credit-ai-sa@credit-ai-project-456311.iam.gserviceaccount.com",
-            "client_id": "117752690884806967717",
+            "client_email": os.getenv("GCLOUD_CLIENT_EMAIL"),
+            "client_id": os.getenv("GCLOUD_CLIENT_ID"),
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
             "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
@@ -1912,3 +1912,36 @@ def get_company_list():
     company_list = sorted([tenant.replace("_", " ") for tenant in tenants.keys() if tenant != "Cenomi_Centres"])
     client_wv.close()
     return company_list
+
+def update_company_keywords(company_name, keywords=None):
+    """
+    Update keywords for a specific company in the company_keywords.json file.
+    If the file doesn't exist, it will be created.
+    
+    Args:
+        company_name (str): Name of the company to update keywords for
+        keywords (list, optional): List of keywords for this company. 
+                                  If None, will use company name as default keyword.
+    """
+    # Default keywords if none provided
+    if keywords is None:
+        keywords = [company_name.lower()]
+    
+    # Connect to storage
+    storage_client = storage.Client(credentials=gcloud_connect_credentials())
+    bucket = storage_client.bucket(os.getenv('GCLOUD_BUCKET_NAME'))
+    blob = bucket.blob('config/company_keywords.json')
+    
+    # Load existing keywords if file exists
+    company_keywords = {}
+    if blob.exists():
+        contents = blob.download_as_bytes()
+        company_keywords = json.loads(contents.decode("utf-8"))
+    
+    # Update keywords for the company
+    company_keywords[company_name] = keywords
+    
+    # Save back to storage
+    blob.upload_from_string(json.dumps(company_keywords, indent=2))
+    storage_client.close()
+    return True

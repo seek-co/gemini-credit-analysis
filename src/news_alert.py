@@ -13,7 +13,7 @@ from google import genai
 from google.genai import types
 from google.cloud import storage
 
-from src.util import gcloud_connect_credentials
+from src.util import gcloud_connect_credentials, get_company_list
 
 
 # load .env if not in production
@@ -22,24 +22,63 @@ if not bool(os.getenv("PRODUCTION_MODE")):
     load_dotenv()
 
 
+def get_company_keywords():
+    """
+    Get company keywords from storage or use default mapping.
+    Returns a dictionary with company names as keys and list of keywords as values.
+    """
+    try:
+        # Try to load keywords from storage
+        storage_client = storage.Client(credentials=gcloud_connect_credentials())
+        bucket = storage_client.bucket(os.getenv('GCLOUD_BUCKET_NAME'))
+        blob = bucket.blob('config/company_keywords.json')
+        
+        if blob.exists():
+            contents = blob.download_as_bytes()
+            company_keywords = json.loads(contents.decode("utf-8"))
+            storage_client.close()
+            return company_keywords
+        
+        # Fall back to default keywords if file doesn't exist
+        storage_client.close()
+    except Exception as e:
+        print(f"Error loading company keywords: {e}")
+    
+    # Default keywords mapping
+    default_keywords = {
+        "Sasol Limited": ["sasol", "sasol limited", "south africa", "south african energy", "south african chemicals"],
+        "Arabian Centres": ["arabian centres", "cenomi", "saudi arabia", "saudi retail", "saudi mall"],
+        "Tullow Oil": ["tullow", "tullow oil", "ghana", "kenya", "oil exploration", "african oil"]
+    }
+    return default_keywords
+
+
 def detect_news_company(news_title, news_body):
     """
     Detect which company the news is related to based on the content.
     Returns the company name and a confidence score.
     """
-    # Companies we're monitoring
-    companies = {
-        "Sasol Limited": ["sasol", "sasol limited", "south africa", "south african energy", "south african chemicals"],
-        "Arabian Centres": ["arabian centres", "cenomi", "saudi arabia", "saudi retail", "saudi mall"],
-        "Tullow Oil": ["tullow", "tullow oil", "ghana", "kenya", "oil exploration", "african oil"]
-    }
+    # Get dynamic company list
+    company_list = get_company_list()
+    company_keywords = get_company_keywords()
+    
+    # Filter the keywords to only include companies in the current company list
+    # and add any new companies with empty keyword list
+    filtered_keywords = {}
+    for company in company_list:
+        if company in company_keywords:
+            filtered_keywords[company] = company_keywords[company]
+        else:
+            # New company with default empty keyword list
+            # At minimum, use the company name itself as a keyword
+            filtered_keywords[company] = [company.lower()]
     
     # Combine title and body for analysis
     combined_text = (news_title + " " + news_body).lower()
     
     # Check for company mentions and calculate a simple score
     results = {}
-    for company, keywords in companies.items():
+    for company, keywords in filtered_keywords.items():
         score = 0
         for keyword in keywords:
             if keyword.lower() in combined_text:
@@ -50,13 +89,17 @@ def detect_news_company(news_title, news_body):
                     score += 1
         results[company] = score
     
+    # If no companies in our database, return empty results
+    if not results:
+        return "", 0
+        
     # Get the company with highest score
     detected_company = max(results.items(), key=lambda x: x[1])
     
     # If no clear match (score 0), try advanced detection using Gemini
     if detected_company[1] == 0:
         try:
-            return detect_company_with_gemini(news_title, news_body)
+            return detect_company_with_gemini(news_title, news_body, company_list)
         except Exception as e:
             # Fall back to best guess if Gemini fails
             return max(results.items(), key=lambda x: x[1])[0], 0
@@ -64,21 +107,26 @@ def detect_news_company(news_title, news_body):
     return detected_company[0], detected_company[1]
 
 
-def detect_company_with_gemini(news_title, news_body):
+def detect_company_with_gemini(news_title, news_body, company_list=None):
     """Use Gemini to detect which company the news is related to"""
     client_gem = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     model = "gemini-2.5-flash-preview-04-17"
     
+    # If company_list is not provided, fetch it
+    if company_list is None:
+        company_list = get_company_list()
+    
+    # Create company options string for prompt
+    company_options = "\n".join([f"- {company}" for company in company_list])
+    
     prompt = f"""
     Determine which company the following news is most related to. The options are:
-    - Sasol Limited (South African energy and chemicals company)
-    - Arabian Centres/Cenomi (Saudi Arabian retail and mall company)
-    - Tullow Oil (Oil exploration company focused on Africa)
+    {company_options}
     
     News title: {news_title}
     News body: {news_body}
     
-    Respond with just the company name exactly as one of the three options above.
+    Respond with just the company name exactly as one of the options above.
     """
     
     response = client_gem.models.generate_text(
@@ -89,23 +137,18 @@ def detect_company_with_gemini(news_title, news_body):
     
     result = response.text.strip()
     
-    # Map partial matches to full company names
-    company_mapping = {
-        "sasol": "Sasol Limited",
-        "arabian": "Arabian Centres",
-        "cenomi": "Arabian Centres",
-        "tullow": "Tullow Oil"
-    }
-    
+    # Check for exact company name match
     detected_company = None
-    for key, value in company_mapping.items():
-        if key.lower() in result.lower():
-            detected_company = value
+    for company in company_list:
+        if company.lower() in result.lower():
+            detected_company = company
             break
     
-    # If still no match, use the first company as default
-    if not detected_company:
-        detected_company = "Sasol Limited"
+    # If still no match, use the first company as default if available
+    if not detected_company and company_list:
+        detected_company = company_list[0]
+    elif not detected_company:
+        detected_company = ""
     
     return detected_company, 5  # High confidence score for AI detection
 

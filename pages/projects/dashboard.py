@@ -18,7 +18,8 @@ from unstructured.partition.md import partition_md
 
 from src.util import (
     gcloud_connect_credentials, get_company_list, extract_data_list, ingest_all_data,
-    parse_new_company_file_to_vector_db, create_gcs_folder, delete_gcs_folder, change_company_name_gsc_to_vectordb
+    parse_new_company_file_to_vector_db, create_gcs_folder, delete_gcs_folder, change_company_name_gsc_to_vectordb,
+    update_company_keywords
 )
 from src.report_gen import CreditReportGenerate
 from src.chatbot import ChatBot, render_message, render_chat_input
@@ -528,6 +529,11 @@ def add_new_company_folder(num_clicks, new_company_folder_name):
                 new_company_folder_name)
             mt_col_cmp.tenants.create(tenants=[Tenant(name=company_name_vector_db)])
             client_wv.close()
+            
+            # Add default keywords for the new company
+            # At minimum, use the company name as a keyword
+            update_company_keywords(new_company_folder_name, [new_company_folder_name.lower()])
+            
             return 0, "", None, f"Created new folder '{gsc_folder_created}'!"
         else:
             return 0, dash.no_update, dash.no_update, dash.no_update
